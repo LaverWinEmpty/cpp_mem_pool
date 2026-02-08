@@ -19,6 +19,9 @@
 #   define DEBUG 1
 #endif
 
+// SPIN LOCK
+#include <lwe/async/lock.hpp>
+
 static thread_local const std::thread::id THIS_THREAD = std::this_thread::get_id();
 
 #define FOR_POOL(X) \
@@ -312,7 +315,7 @@ public:
     Pool(size_t chunk): CHUNK(alginer(chunk)), MAX(limiter(CHUNK)), OUTER(THIS_THREAD) {}
 
 public:
-    template<typename T, typename... Args> T* allocate(Args&&... in) {
+    template<typename T = void, typename... Args> T* allocate(Args&&... in) {
         if(void* ptr = allocate<void>()) {
             if constexpr (sizeof...(Args) != 0) {
                 return new(ptr) T(std::forward<Args>(in)...);
@@ -465,6 +468,22 @@ public:
         }
     }
 
+public:
+    //! @brief Local Thread Storedge
+    template<size_t CHUNK>
+    static Pool* lts() {
+        static thread_local Pool pool(CHUNK);
+        return &pool;
+    }
+
+private:
+    // for Allocator
+    template<typename T> friend class Allocator;
+    //! @biref for global pool
+    class Singleton;
+    //! @brief get global pool
+    template<size_t> static Singleton* singleton();
+
 private:
     class List {
     public:
@@ -513,7 +532,6 @@ public:
     const std::thread::id OUTER;
 };
 
-
 inline static constexpr uint64_t align(uint64_t in) noexcept {
     if (in <= 1) {
         return 1;
@@ -522,6 +540,69 @@ inline static constexpr uint64_t align(uint64_t in) noexcept {
     for (uint64_t i = 1; i < sizeof(uint64_t); i <<= 1) {
         in |= in >> i;
     }
-    std::cout << std::hex << in << '\n';
     return in + 1;
 }
+
+class Pool::Singleton {
+public:
+    Singleton(size_t CHUNK): pool(CHUNK) { }
+    Pool             pool;
+    lwe::async::Lock spin; // normal lock
+    std::mutex       mtx;  // os call lock
+};
+
+template<size_t CHUNK> Pool::Singleton* Pool::singleton() {
+    static Singleton instance{ CHUNK };
+    return &instance;
+}
+
+template<typename T> class Allocator {
+public:
+    template<typename... Args> static T* allocate(Args&&... in) {
+        // return instance.allocate<T>(std::forward<T>(in));
+
+        static Pool&             pool = instance->pool;
+        static LWE::async::Lock& spin = instance->spin;
+        static std::mutex&       mtx  = instance->mtx;
+
+        while (true) {
+            LOCKGUARD(spin) {
+                // check current block
+                if ((pool.current != nullptr) ||
+                    (pool.current = pool.used.next()) ||
+                    (pool.current = pool.full.next())) {
+                    // not null -> returned immediately
+                    return pool.allocate<T>(std::forward<Args>(in)...);
+                }
+            }
+
+            //! OS CALL, use mutex
+            LOCKGUARD(mtx) {
+                // check and system call
+                if (!pool.current) {
+                    pool.current = pool.generate();
+                    // OS CALL FAILED
+                    if (pool.current == nullptr) {
+                        return nullptr;
+                    }
+                }
+            }
+        }
+    }
+
+public:
+    template<typename T = void> static void release(T* in) {
+        static Pool&             pool = instance->pool;
+        static LWE::async::Lock& spin = instance->lock;
+
+        LOCKGUARD(spin) {
+            pool.release(in);
+        }
+    }
+
+private:
+    static Pool::Singleton* instance;
+};
+
+//! @brief shared instance using the same chunk size
+template<typename T> Pool::Singleton* Allocator<T>::instance = Pool::singleton<align(sizeof(T))>();
