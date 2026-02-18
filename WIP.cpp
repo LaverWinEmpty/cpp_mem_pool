@@ -14,9 +14,9 @@
 #include <cassert>
 
 #ifdef NDEBUG
-#   define DEBUG 0
+#    define DEBUG 0
 #else
-#   define DEBUG 1
+#    define DEBUG 1
 #endif
 
 // SPIN LOCK
@@ -37,31 +37,36 @@ static thread_local const std::thread::id THIS_THREAD = std::this_thread::get_id
 class Fatal {
 public:
     template<typename T> static void initialize() {
-        if (!instance) {
-            std::atexit([]() {delete Fatal::instance;});
+        if(!instance) {
+            std::atexit([]() { delete Fatal::instance; });
         }
         else delete instance;
         instance = new T();
     }
 public:
     static void call(const char* msg) noexcept {
-        if (instance) {
+        if(instance) {
             instance->proc(msg);
         }
         else std::terminate(); // defualt: shutdown
     }
 protected:
     virtual void proc(const char* msg) = 0;
-    virtual ~Fatal() = default;
-    Fatal() = default;
+    virtual ~Fatal()                   = default;
+    Fatal()                            = default;
 private:
     static Fatal* instance;
 };
 Fatal* Fatal::instance;
 
-#define CRASH(msg) do { if(DEBUG) throw std::runtime_error(msg); else Fatal::call(msg); } while (false)
+#define CRASH(msg)                               \
+    do {                                         \
+        if(DEBUG) throw std::runtime_error(msg); \
+        else Fatal::call(msg);                   \
+    }                                            \
+    while(false)
 
-template<size_t N> struct Mask {
+template<size_t N> class Mask {
 public:
     void on(size_t index) {
         bits[index >> 6] |= (1ull << uint64_t(index & (64 - 1))); // [index / 64] |= index % 64
@@ -77,19 +82,19 @@ public:
     }
 public:
     size_t next() const {
-        for (int i = 0; i < N; ++i) {
-            if (bits[i] != uint64_t(-1)) {
-            #ifdef _MSC_VER
+        for(int i = 0; i < N; ++i) {
+            if(bits[i] != uint64_t(-1)) {
+#ifdef _MSC_VER
                 // Win32 API
                 unsigned long index;
                 if(_BitScanForward64(&index, ~bits[i])) {
                     return size_t((i << 6) + index);
                 }
-            #else
+#else
                 // GCC / clang
                 uint64_t inv = ~bits[i];
                 return size_t((i << 6) + (inv ? __builtin_ctzll(inv) : 0));
-            #endif
+#endif
             }
         }
         return size_t(-1);
@@ -113,7 +118,7 @@ using Bit256 = Mask<4>;
     (ptr & ~0xFFFF) -> block address
 
     ! ALIGNMENT SUPPORT: data starts at 0x0000
- 
+
     [proof]
     - B: BlockSize(64KB), P: Pointer(8B), S: ObjectSize(aligned 8n)
     - N: Max objects (Calculated by: 8(B-P) / (8S+1))
@@ -132,7 +137,7 @@ using Bit256 = Mask<4>;
     ! amount => 524224 / bits, round down
     ! mask   => ceil(amount / 64) * 8 bytes (bitmap size)
 
-    param | bits | amount              | bit mask  | total 
+    param | bits | amount              | bit mask  | total
     ------+------+---------------------+-----------+------------
         8 |   65 |  8062 (64496 byte)  | 1008 byte | 65504 byte
        16 |  129 |  4062 (64992 byte)  |  512 byte | 65504 byte
@@ -162,7 +167,7 @@ class Pool {
         Block* next  = 0;
         Block* prev  = 0;
     };
-    
+
     //! @tparam chunk size byte
     //! @note constructor not   call, set zero memory
     template<size_t BYTE> struct Preset {
@@ -177,25 +182,22 @@ class Pool {
         Meta    meta;
 
         // cast to Block
-        Block* cast() {
-            return reinterpret_cast<Block*>(this);
-        }
+        Block* cast() { return reinterpret_cast<Block*>(this); }
     };
 
     union Block {
-    #define BLOCK_MACRO_UNION(X)\
-        Preset<X> _##X;
+#define BLOCK_MACRO_UNION(X) Preset<X> _##X;
         FOR_POOL(BLOCK_MACRO_UNION);
-    #undef BLOCK_MACRO_UNION
+#undef BLOCK_MACRO_UNION
 
         //! @brief memset wrapper for placement new
         Block(Pool* in) {
             // active member check (for prevent UB)
-            switch (in->CHUNK) {
-            #define BLOCK_MACRO_CONSTRUCT(X)\
-                case X: new (this) Preset<X>(); break;
+            switch(in->CHUNK) {
+#define BLOCK_MACRO_CONSTRUCT(X)          \
+    case X: new(this) Preset<X>(); break;
                 FOR_POOL(BLOCK_MACRO_CONSTRUCT);
-            #undef BLOCK_MACRO_CONSTRUCT
+#undef BLOCK_MACRO_CONSTRUCT
             }
             meta()->outer = in;
         }
@@ -211,37 +213,29 @@ class Pool {
 
         // get bit mask
         template<size_t N> typename Preset<N>::State* state() {
-            if constexpr (false) {} // if-else chain
-        #define BLOCK_MACRO_STATE(X)\
-            else if constexpr(N == X) { return &_##X.state; }
+            if constexpr(false) { } // if-else chain
+#define BLOCK_MACRO_STATE(X)    \
+    else if constexpr(N == X) { \
+        return &_##X.state;     \
+    }
             FOR_POOL(BLOCK_MACRO_STATE);
-        #undef BLOCK_MACRO_STATE
+#undef BLOCK_MACRO_STATE
             return nullptr;
         }
     };
 
-    static Block* from(void* in) {
-        return reinterpret_cast<Block*>(uintptr_t(in) & ~0xFFFF);
-    }
+    static Block* from(void* in) { return reinterpret_cast<Block*>(uintptr_t(in) & ~0xFFFF); }
 
 public:
-    size_t indexing(void* in) {
-        return (uintptr_t(in) & 0xFFFF) / CHUNK;
-    }
+    size_t indexing(void* in) { return (uintptr_t(in) & 0xFFFF) / CHUNK; }
 
 protected:
     Block* generate() {
         void* ptr;
-    #ifdef _WIN32
-        ptr = VirtualAlloc(
-            nullptr, BLOCK,
-            MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-        );
-    #else
-        ptr = mmap(NULL, BLOCK * 2,
-            PROT_READ | PROT_WRITE,
-            MAP_PRIVATE | MAP_ANONYMOUS,
-            -1, 0 // file
+#ifdef _WIN32
+        ptr = VirtualAlloc(nullptr, BLOCK, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
+        ptr = mmap(NULL, BLOCK * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 // file
         );
 
         if(ptr == reinterpret_cast<void*>(-1)) {
@@ -255,10 +249,10 @@ protected:
             munmap(ptr, aligned - address); // trim front
         }
         ptr = reinterpret_cast<void*>(aligned + BLOCK); // remainder
-        munmap(ptr, BLOCK - (aligned - address)); // trim back
+        munmap(ptr, BLOCK - (aligned - address));       // trim back
 
         ptr = reinterpret_cast<void*>(aligned); // -= BLOCK
-    #endif
+#endif
         if(ptr) {
             new(ptr) Block(this); // init
         }
@@ -277,56 +271,56 @@ private:
 
         ptr->~Block(); // trivial destructor: placement new pair
 
-    #ifdef _WIN32
+#ifdef _WIN32
         VirtualFree(ptr, 0, MEM_RELEASE);
-    #else
+#else
         munmap(ptr, BLOCK);
-    #endif
+#endif
     }
 
 private:
     static constexpr size_t alginer(size_t chunk) {
         // TODO: 비트연산으로 변경
-        if (chunk <= 8)    return 8;
-        if (chunk <= 16)   return 16;
-        if (chunk <= 32)   return 32;
-        if (chunk <= 64)   return 64;
-        if (chunk <= 128)  return 128;
-        if (chunk <= 256)  return 256;
-        if (chunk <= 512)  return 512;
-        if (chunk <= 1024) return 1024;
+        if(chunk <= 8) return 8;
+        if(chunk <= 16) return 16;
+        if(chunk <= 32) return 32;
+        if(chunk <= 64) return 64;
+        if(chunk <= 128) return 128;
+        if(chunk <= 256) return 256;
+        if(chunk <= 512) return 512;
+        if(chunk <= 1024) return 1024;
         return chunk;
     }
 
     static constexpr size_t limiter(size_t chunk) {
         // TODO: 비트연산으로 변경
-        if (chunk <= 8)    return Preset<8>::MAX;
-        if (chunk <= 16)   return Preset<16>::MAX;
-        if (chunk <= 32)   return Preset<32>::MAX;
-        if (chunk <= 64)   return Preset<64>::MAX;
-        if (chunk <= 128)  return Preset<128>::MAX;
-        if (chunk <= 256)  return Preset<256>::MAX;
-        if (chunk <= 512)  return Preset<512>::MAX;
-        if (chunk <= 1024) return Preset<1024>::MAX;
+        if(chunk <= 8) return Preset<8>::MAX;
+        if(chunk <= 16) return Preset<16>::MAX;
+        if(chunk <= 32) return Preset<32>::MAX;
+        if(chunk <= 64) return Preset<64>::MAX;
+        if(chunk <= 128) return Preset<128>::MAX;
+        if(chunk <= 256) return Preset<256>::MAX;
+        if(chunk <= 512) return Preset<512>::MAX;
+        if(chunk <= 1024) return Preset<1024>::MAX;
         return 0;
     }
 
 public:
-    Pool(size_t chunk): CHUNK(alginer(chunk)), MAX(limiter(CHUNK)), OUTER(THIS_THREAD) {}
+    Pool(size_t chunk): CHUNK(alginer(chunk)), MAX(limiter(CHUNK)), OUTER(THIS_THREAD) { }
 
 public:
     template<typename T = void, typename... Args> T* allocate(Args&&... in) {
         if(void* ptr = allocate<void>()) {
-            if constexpr (sizeof...(Args) != 0) {
+            if constexpr(sizeof...(Args) != 0) {
                 return new(ptr) T(std::forward<Args>(in)...);
             }
             else return new(ptr) T();
         }
         return nullptr;
     }
-    
+
     template<> void* allocate<void>() {
-        if (MAX == 0) {
+        if(MAX == 0) {
             return malloc(CHUNK);
         }
         // check block
@@ -335,9 +329,9 @@ public:
             if(!current) {
                 current = full.next(); // recycle (second)
                 // last: alloc
-                if (!current) {
+                if(!current) {
                     current = generate();
-                    if (!current) {
+                    if(!current) {
                         return nullptr; // failed
                     }
                 }
@@ -346,15 +340,15 @@ public:
 
         // check state
         size_t index = size_t(-1);
-        switch (CHUNK) {
-        #define BLOCK_MACRO_ON(X)\
-            case X: {\
-                auto state = current->state<X>(); \
-                index = state->next();            \
-                state->on(index);                 \
-            } break; // get state and check
+        switch(CHUNK) {
+#define BLOCK_MACRO_ON(X)                 \
+    case X: {                             \
+        auto state = current->state<X>(); \
+        index      = state->next();       \
+        state->on(index);                 \
+    } break; // get state and check
             FOR_POOL(BLOCK_MACRO_ON);
-        #undef BLOCK_MACRO_ON
+#undef BLOCK_MACRO_ON
         }
 
         // return
@@ -362,7 +356,7 @@ public:
 
         // get meta, and MAX to index
         Meta* meta = current->meta();
-        if (++meta->used > MAX - 1) {
+        if(++meta->used > MAX - 1) {
             empty.push(current); // check overflow, and set empty state
             current = nullptr;
         }
@@ -393,22 +387,24 @@ public:
         if(meta->outer->OUTER != THIS_THREAD) CRASH("THREAD MISMATCH");
 
         // uncheck state
-        switch (CHUNK) {
-        #define BLOCK_MACRO_OFF(X)\
-            case X: { block->state<X>()->off(index); } break; // get state and off
+        switch(CHUNK) {
+#define BLOCK_MACRO_OFF(X)             \
+    case X: {                          \
+        block->state<X>()->off(index); \
+    } break; // get state and off
             FOR_POOL(BLOCK_MACRO_OFF);
-        #undef BLOCK_MACRO_OFF
+#undef BLOCK_MACRO_OFF
         }
 
         // current -> ignore state changes
-        if (block != current) {
+        if(block != current) {
             // MAX(overflow) -> MAX - 1
-            if (meta->used == MAX) {
+            if(meta->used == MAX) {
                 empty.pop(block); // empty to
                 used.push(block); // used
             }
             // 1 -> 0
-            if (meta->used == 1) {
+            if(meta->used == 1) {
                 used.pop(block);  // used to
                 full.push(block); // full
             }
@@ -423,20 +419,20 @@ public:
         size_t n = 0;
         while(n++ < cnt) {
             Block* block = generate();
-            if (!current) {
+            if(!current) {
                 return n - 1; // failed
             }
             full.push(block); // insert
         }
         return n; // create count
     }
-        
+
 public:
     size_t shrink(size_t in = size_t(-1)) {
         size_t cnt = 0;
         Block* del = full.next(); // pop
 
-        for (size_t i = 0; i < in && del; ++i) {
+        for(size_t i = 0; i < in && del; ++i) {
             Block* temp = full.next(); // pop
             destroy(del);              // delete
             del = temp;                // set next
@@ -446,9 +442,7 @@ public:
     }
 
 public:
-    bool destructible() {
-        return current->meta()->used == 0 && used.head == nullptr && empty.head == nullptr;
-    }
+    bool destructible() { return current->meta()->used == 0 && used.head == nullptr && empty.head == nullptr; }
 
 public:
     ~Pool() {
@@ -457,7 +451,7 @@ public:
             List& curr = *list[i];
 
             Block* del = curr.next(); // pop
-            while (del != nullptr) {
+            while(del != nullptr) {
                 Block* temp = curr.next(); // pop
                 destroy(del);              // delete
                 del = temp;                // set next
@@ -498,19 +492,19 @@ private:
         }
 
         void pop(Block* in) {
-            Meta* meta = in->meta();
+            Meta*  meta = in->meta();
             Block* prev = meta->prev;
             Block* next = meta->next;
-            if (prev) prev->meta()->next = next;
-            if (next) next->meta()->prev = prev;
-            if (in == head) head = next;
+            if(prev) prev->meta()->next = next;
+            if(next) next->meta()->prev = prev;
+            if(in == head) head = next;
         }
 
         Block* next() {
             Block* out = head;
-            if (out) {
+            if(out) {
                 Meta* meta = out->meta();
-                head = meta->next;
+                head       = meta->next;
                 meta->next = nullptr;
                 meta->prev = nullptr;
             }
@@ -533,11 +527,11 @@ public:
 };
 
 inline static constexpr uint64_t align(uint64_t in) noexcept {
-    if (in <= 1) {
+    if(in <= 1) {
         return 1;
     }
     in -= 1;
-    for (uint64_t i = 1; i < sizeof(uint64_t); i <<= 1) {
+    for(uint64_t i = 1; i < sizeof(uint64_t); i <<= 1) {
         in |= in >> i;
     }
     return in + 1;
@@ -565,12 +559,12 @@ public:
         static LWE::async::Lock& spin = instance->spin;
         static std::mutex&       mtx  = instance->mtx;
 
-        while (true) {
+        while(true) {
             LOCKGUARD(spin) {
                 // check current block
-                if ((pool.current != nullptr) ||
-                    (pool.current = pool.used.next()) ||
-                    (pool.current = pool.full.next())) {
+                if((pool.current != nullptr) ||
+                   (pool.current = pool.used.next()) ||
+                   (pool.current = pool.full.next())) {
                     // not null -> returned immediately
                     return pool.allocate<T>(std::forward<Args>(in)...);
                 }
@@ -579,10 +573,10 @@ public:
             //! OS CALL, use mutex
             LOCKGUARD(mtx) {
                 // check and system call
-                if (!pool.current) {
+                if(!pool.current) {
                     pool.current = pool.generate();
                     // OS CALL FAILED
-                    if (pool.current == nullptr) {
+                    if(pool.current == nullptr) {
                         return nullptr;
                     }
                 }
@@ -606,3 +600,5 @@ private:
 
 //! @brief shared instance using the same chunk size
 template<typename T> Pool::Singleton* Allocator<T>::instance = Pool::singleton<align(sizeof(T))>();
+
+#undef FOR_POOL
