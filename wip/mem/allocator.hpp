@@ -245,31 +245,28 @@ size_t Allocator<N>::reserve(size_t cnt) {
     if(usable >= cnt) return 0;    // reserved
     if(Chunk::COUNT < 8) return 0; // cannot be pooled
 
-    cnt = (cnt - usable) * N;                    // need amount to byte
-    cnt = global::bit_align(cnt, CHUNK) / CHUNK; // align
+    cnt = (cnt - usable); // need count
 
     size_t generated = 0;
-    while(generated < cnt) {
+    for (; generated < cnt; generated += Chunk::COUNT) {
         Chunk* chunk = generate();
         if(!chunk) {
-            return generated; // failed
+            break; // failed
         }
         empty.push(chunk); // insert
-
-        ++generated;
     }
-    return generated * Chunk::COUNT; // create count
+    return generated; // create count
 }
 
 template<size_t N>
 size_t Allocator<N>::shrink() {
     size_t cnt = 0;
-    Chunk* del = empty.next(); // pop
+    Chunk* del = empty.pop(); // pop
 
     while(del != nullptr) {
-        Chunk* temp = empty.next(); // pop
-        destroy(del);               // delete
-        del = temp;                 // set next
+        Chunk* temp = empty.pop(); // pop
+        destroy(del);              // delete
+        del = temp;                // set next
         ++cnt;
     }
     return cnt;
