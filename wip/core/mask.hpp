@@ -12,28 +12,28 @@ public:
      * @param  [in] size_t index
      * @return this
      */
-    Mask<N>& on(size_t);
+    Mask<N>& on(uint64_t);
 
 public:
     /**
      *@param  [in] size_t index
      *@return this
      */
-    Mask<N>& off(size_t);
+    Mask<N>& off(uint64_t);
 
 public:
     /**
      * @param  [in] size_t index
      * @return this
      */
-    Mask<N>& toggle(size_t);
+    Mask<N>& toggle(uint64_t);
 
 public:
     /**
      * @param  [in] size_t index
      * @return get flag state
      */
-    bool check(size_t) const;
+    bool check(uint64_t) const;
 
 public:
     /**

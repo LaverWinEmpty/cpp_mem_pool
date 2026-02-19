@@ -9,8 +9,17 @@
 
 //! @brief allocator instance
 template<size_t> class Allocator {
+private:
+    //! @brief chunk size preset
+    struct Chunk;
+
+private:
+    //! @brief footer
+    struct Meta;
+
 public:
     static constexpr size_t CHUNK = 64 * 1024; // byte == 64KiB
+    static constexpr size_t UNIT  = Chunk::COUNT;
 
 public:
     /**
@@ -70,13 +79,6 @@ public:
 public:
     size_t remainder() { return usable; }
 
-private:
-    //! @brief chunk size preset
-    struct Chunk;
-
-private:
-    //! @brief footer
-    struct Meta;
 
 private:
     //! @brief chunk single linked list
@@ -220,7 +222,7 @@ template<typename T> void Allocator<N>::release(T* in) {
     if(chunk->meta.outer != this) std::abort();
 
     // set state and check
-    current->state.off(index);
+    chunk->state.off(index);
     if(chunk != current) {
         // usage full -> partial
         if(chunk->meta.used == Chunk::COUNT) {
