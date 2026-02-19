@@ -245,8 +245,8 @@ size_t Allocator<N>::reserve(size_t cnt) {
     if(usable >= cnt) return 0;    // reserved
     if(Chunk::COUNT < 8) return 0; // cannot be pooled
 
-    cnt = (cnt - usable);                       // need amount
-    cnt = global::bit_align(cnt, Chunk::COUNT); // align
+    cnt = (cnt - usable) * N;                    // need amount to byte
+    cnt = global::bit_align(cnt, CHUNK) / CHUNK; // align
 
     size_t generated = 0;
     while(generated < cnt) {
@@ -256,9 +256,9 @@ size_t Allocator<N>::reserve(size_t cnt) {
         }
         empty.push(chunk); // insert
 
-        generated += Chunk::COUNT;
+        ++generated;
     }
-    return generated; // create count
+    return generated * Chunk::COUNT; // create count
 }
 
 template<size_t N>
