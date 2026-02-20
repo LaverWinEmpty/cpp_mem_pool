@@ -30,9 +30,9 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
     void* ptr = nullptr;
 
 #if CHECK_TARGET(OS_WINDOWS)
-    // TODO
-    using Cast = void* __stdcall (*)(void*, void*, size_t, unsigned long, unsigned long, void*, unsigned long)
-    auto f = (Cast)GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2");
+    static auto valloc2 =
+        (void*(__stdcall*)(void*, void*, size_t, unsigned long, unsigned long, void*, unsigned long))
+        GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2");
 
     // check callable VirtualAlloc2
     if(f) {
@@ -53,26 +53,19 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
         } param = { 1, 0 };
         param.ptr = &addr;
 
-        return _VirtualAlloc2(
-            GetCurrentProcess(),
-            NULL,
-            size,
-            MEM_RESERVE | MEM_COMMIT, 
-            PAGE_READWRITE,
-            &param,
-            1
-        );
-
         // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-        return f(GetProcAddress(), nullptr, size, 0x1000 | 0x2000, 0x4, &param, 1);
+        return valloc2(GetCurrentProcess(), nullptr, size, 0x1000 | 0x2000, 0x4, &param, 1);
     }
 
-    // use VirtualAlloc: address are automatically aligned to 64KiB
-    // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-    ptr = VirtualAlloc(nullptr, BYTE, 0x1000 | 0x2000, 0x04);
-
-
-
+    // fallback
+    // param: MEM_RESERVE, PAGE_NOACCESS
+    ptr = VirtualAlloc(nullptr, BYTE, 0x2000, 0x1);
+    if(ptr) {
+        ptr = reinterpret_cast<void*>(bit_align(uint64_t(ptr), ALIGNMENT));
+        // param:  MEM_COMMIT, PAGE_READWIRTE
+        ptr = VirtualAlloc(ptr, size, 0x1000, 0x4)
+    }
+    // else return nullptr
 
 #elif CHECK_TARGET(OS_POSIX)
     const size_t ALLOC = bit_align(BYTE + ALIGNMENT, ALIGNMENT); // with address alignment size
@@ -124,8 +117,24 @@ void pal_vfree(void* ptr, size_t in) noexcept {
     if(!ptr) return;
 
 #if CHECK_TARGET(OS_WINDOWS)
-    // MEM_RELEASE
-    VirtualFree(ptr, 0, 0x00008000);
+    static bool is2 = GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2") != nullptr;
+
+   if(!is2) {
+        // MEMORY_BASIC_INFORMATION binary layout
+        struct {
+            void*    base;
+            void*    allocated;
+            uint32_t guard;
+            int32_t  id;
+            size_t   size;
+            uint32_t state;
+            uint32_t protect;
+            uint32_t type;
+        } info;
+        VirtualQuery(ptr, reinterpret_cast<void*>(info), sizeof(info));
+        ptr = info.allogated;
+   }
+   VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 #elif CHECK_TARGET(OS_POSIX)
     munmap(ptr, bit_align(ptr, 4096)); // alignment to 4096
 #else
