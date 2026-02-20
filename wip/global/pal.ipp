@@ -31,21 +31,27 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
 
 #if CHECK_TARGET(OS_WINDOWS)
     // TODO
-    using Cast = void* __stdcall (*)(void*, void*, size_t, unsigned long, unsigned long, void*, )
-    auto f = (Cast)GetProcAddress(GetModuleHandleA("kernal.dll"), "VirtualAlloc2");
+    using Cast = void* __stdcall (*)(void*, void*, size_t, unsigned long, unsigned long, void*, unsigned long)
+    auto f = (Cast)GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2");
+
     // check callable VirtualAlloc2
     if(f) {
-        //! TODO: copy _MEM_ADDRESS_REQUREMENTS and _MEM_EXTENDED_PARAMETER
+        // MEM_ADDRESS_REQUREMENTS binary layout
         struct {
             void*  l;
             void*  h;
             size_t n;
         } addr = { NULL, NULL, ALIGNMENT };
 
+        // MEM_EXTENDED_PARAMETER binary layout
         struct {
-            uint64_t type;
-            void*    ptr;
-        } param = { 1, &addr };
+            uint64_t type; // uint64_t : 8 == uint64_t (windows is LE)
+            union {
+                uint64_t n;
+                void*    ptr;
+            }
+        } param = { 1, 0 };
+        param.ptr = &addr;
 
         return _VirtualAlloc2(
             GetCurrentProcess(),
@@ -56,11 +62,14 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
             &param,
             1
         );
+
+        // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
+        return f(GetProcAddress(), nullptr, size, 0x1000 | 0x2000, 0x4, &param, 1);
     }
 
     // use VirtualAlloc: address are automatically aligned to 64KiB
     // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-    ptr = VirtualAlloc(nullptr, BYTE, 0x00001000 | 0x00002000, 0x04);
+    ptr = VirtualAlloc(nullptr, BYTE, 0x1000 | 0x2000, 0x04);
 
 
 
