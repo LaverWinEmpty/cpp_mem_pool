@@ -31,8 +31,8 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
 
 #if CHECK_TARGET(OS_WINDOWS)
     static auto valloc2 =
-        (void*(__stdcall*)(void*, void*, size_t, unsigned long, unsigned long, void*, unsigned long))
-        GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2");
+        (void*(__stdcall*)(void*, void*, size_t, uint32_t, uint32_t, void*, uint32_t))
+        GetProcAddress(GetModuleHandleA("kernelbase.dll"), "VirtualAlloc2");
 
     // check callable VirtualAlloc2
     if(valloc2) {
