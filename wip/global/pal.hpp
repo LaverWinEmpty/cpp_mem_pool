@@ -2,6 +2,11 @@
 #define GLOBAL_PAL_HPP
 
 #include "internal/target.h"
+#include "bit.hpp"
+
+#if TARGET_OS == OS_WINDOWS
+#    include <intrin.h>
+#endif
 
 /**************************************************************************************************
  * Platform Abratction Layer PREFIX: pal
@@ -43,19 +48,9 @@ extern "C" {
     __declspec(dllimport) void* __stdcall GetModuleHandleA(const char*);
     __declspec(dllimport) void* __stdcall GetProcAddress(void*, const char*);
 
-    __declspec(dllimport) void* __stdcall
-#    if TARGET_BITS == BITS_64
-        VirtualAlloc(void*, unsigned long long, unsigned long, unsigned long);
-#    else
-        VirtualAlloc(void*, unsigned long,      unsigned long, unsigned long);
-#    endif
-
-    __declspec(dllimport) int __stdcall
-#    if TARGET_BITS == BITS_64
-        VirtualFree(void*, unsigned long long, unsigned long);
-#    else
-        VirtualFree(void*, unsigned long,      unsigned long);
-#    endif
+    __declspec(dllimport) void*  __stdcall VirtualAlloc(void*, size_t, uint32_t, uint32_t);
+    __declspec(dllimport) int    __stdcall VirtualFree(void*, size_t, uint32_t);
+    __declspec(dllimport) size_t __stdcall VirtualQuery(void*, void*, size_t);
 #endif
 }
 
