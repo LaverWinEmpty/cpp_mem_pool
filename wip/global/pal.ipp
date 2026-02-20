@@ -59,7 +59,7 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
 
     // fallback
     // param: MEM_RESERVE, PAGE_NOACCESS
-    ptr = VirtualAlloc(nullptr, BYTE, 0x2000, 0x1);
+    ptr = VirtualAlloc(nullptr, BYTE + ALIGNMENT, 0x2000, 0x1);
     if(ptr) {
         ptr = reinterpret_cast<void*>(bit_align(uint64_t(ptr), ALIGNMENT));
         // param:  MEM_COMMIT, PAGE_READWIRTE
