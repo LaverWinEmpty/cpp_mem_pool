@@ -36,27 +36,25 @@ void pal_vfree(void* in, size_t kb = 64) noexcept;
 
 } // namespace global
 
-//! NEED: "Windows.h"
+//! @NOTE: like as "Windows.h"
 extern "C" {
-#ifndef _WIN64
-#    define MY_STDCALL __attribute__((stdcall))
-#else
-#    define MY_STDCALL
-#endif
-
 #if TARGET_OS == OS_WINDOWS
+    __declspec(dllimport) void* __stdcall GetCurrentProcess();
+    __declspec(dllimport) void* __stdcall GetModuleHandleA(const char*);
+    __declspec(dllimport) void* __stdcall GetProcAddress(void*, const char*);
+
     __declspec(dllimport) void* __stdcall
 #    if TARGET_BITS == BITS_64
         VirtualAlloc(void*, unsigned long long, unsigned long, unsigned long);
 #    else
-        VirtualAlloc(void*, unsigned long, unsigned long, unsigned long);
+        VirtualAlloc(void*, unsigned long,      unsigned long, unsigned long);
 #    endif
 
     __declspec(dllimport) int __stdcall
 #    if TARGET_BITS == BITS_64
         VirtualFree(void*, unsigned long long, unsigned long);
 #    else
-        VirtualFree(void*, unsigned long, unsigned long);
+        VirtualFree(void*, unsigned long,      unsigned long);
 #    endif
 #endif
 }

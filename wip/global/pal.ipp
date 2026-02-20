@@ -22,16 +22,48 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
     static constexpr size_t ALIGNMENT = 64 * 1024;                    // 64KiB alignment
     static constexpr size_t SAFETY    = size_t(-1) - (ALIGNMENT * 2); // protect overflow
 
-    const size_t BYTE = bit_align(in, 4096); // 4KiB alignment, to byte
+    //! @TODO:
+    const size_t BYTE = bit_align(in, 0); // 4KiB alignment, to byte
     if(BYTE > SAFETY) {
         return nullptr; // invalid
     }
     void* ptr = nullptr;
 
 #if CHECK_TARGET(OS_WINDOWS)
+    // TODO
+    using Cast = void* __stdcall (*)(void*, void*, size_t, unsigned long, unsigned long, void*, )
+    auto f = (Cast)GetProcAddress(GetModuleHandleA("kernal.dll"), "VirtualAlloc2");
+    // check callable VirtualAlloc2
+    if(f) {
+        //! TODO: copy _MEM_ADDRESS_REQUREMENTS and _MEM_EXTENDED_PARAMETER
+        struct {
+            void*  l;
+            void*  h;
+            size_t n;
+        } addr = { NULL, NULL, ALIGNMENT };
+
+        struct {
+            uint64_t type;
+            void*    ptr;
+        } param = { 1, &addr };
+
+        return _VirtualAlloc2(
+            GetCurrentProcess(),
+            NULL,
+            size,
+            MEM_RESERVE | MEM_COMMIT, 
+            PAGE_READWRITE,
+            &param,
+            1
+        );
+    }
+
     // use VirtualAlloc: address are automatically aligned to 64KiB
     // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
     ptr = VirtualAlloc(nullptr, BYTE, 0x00001000 | 0x00002000, 0x04);
+
+
+
 
 #elif CHECK_TARGET(OS_POSIX)
     const size_t ALLOC = bit_align(BYTE + ALIGNMENT, ALIGNMENT); // with address alignment size
