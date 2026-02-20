@@ -117,7 +117,7 @@ void pal_vfree(void* ptr, size_t in) noexcept {
     if(!ptr) return;
 
 #if CHECK_TARGET(OS_WINDOWS)
-    static bool is2 = GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2") != nullptr;
+    static bool is2 = GetProcAddress(GetModuleHandleA("kernelbase.dll"), "VirtualAlloc2") != nullptr;
 
    if(!is2) {
         // MEMORY_BASIC_INFORMATION binary layout
