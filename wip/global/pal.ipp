@@ -35,7 +35,7 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
         GetProcAddress(GetModuleHandleA("kernel32.dll"), "VirtualAlloc2");
 
     // check callable VirtualAlloc2
-    if(f) {
+    if(valloc2) {
         // MEM_ADDRESS_REQUREMENTS binary layout
         struct {
             void*  l;
@@ -49,12 +49,12 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
             union {
                 uint64_t n;
                 void*    ptr;
-            }
+            };
         } param = { 1, 0 };
         param.ptr = &addr;
 
         // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-        return valloc2(GetCurrentProcess(), nullptr, size, 0x1000 | 0x2000, 0x4, &param, 1);
+        return valloc2(GetCurrentProcess(), nullptr, BYTE, 0x1000 | 0x2000, 0x4, &param, 1);
     }
 
     // fallback
@@ -63,7 +63,7 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
     if(ptr) {
         ptr = reinterpret_cast<void*>(bit_align(uint64_t(ptr), ALIGNMENT));
         // param:  MEM_COMMIT, PAGE_READWIRTE
-        ptr = VirtualAlloc(ptr, size, 0x1000, 0x4)
+        ptr = VirtualAlloc(ptr, BYTE, 0x1000, 0x4);
     }
     // else return nullptr
 
@@ -131,8 +131,8 @@ void pal_vfree(void* ptr, size_t in) noexcept {
             uint32_t protect;
             uint32_t type;
         } info;
-        VirtualQuery(ptr, reinterpret_cast<void*>(info), sizeof(info));
-        ptr = info.allogated;
+        VirtualQuery(ptr, reinterpret_cast<void*>(&info), sizeof(info));
+        ptr = info.allocated;
    }
    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 #elif CHECK_TARGET(OS_POSIX)
