@@ -16,28 +16,17 @@ template<size_t = 0, typename = void> class Allocator;
 //!        and use it as a helper
 template<typename T> class Allocator<0, T> {
 public:
-    static constexpr size_t aligner(size_t n) {
-        return (n + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
-    }
-
+    static constexpr size_t aligner(size_t n) { return (n + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 private:
     Allocator() = delete;
 };
 
 //! @brief non-aligned size allocator
-template <size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>> :
-    public Allocator<Allocator<>::aligner(N)> {
-    using Base = Allocator<Allocator<>::aligner(N)>;
-
-public:
-    Allocator(): Base() {}
-};
+template<size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>>
+    : public Allocator<Allocator<>::aligner(N)> { };
 
 //! @brief pre-aligned size allocator
 template<size_t N, typename> class Allocator {
-public:
-    using Base = void; // if void then not align N
-
 public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
 
@@ -63,7 +52,7 @@ public:
     /**
      * @brief constructor
      */
-    Allocator() = default;
+    Allocator();
 
 public:
     /**

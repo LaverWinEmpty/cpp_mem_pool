@@ -3,10 +3,10 @@
 #endif
 
 template<size_t N, typename T> struct Allocator<N, T>::Meta {
-    size_t used  = 0;
-    Allocator*  outer = 0;
-    Chunk* next  = nullptr;
-    Chunk* prev  = nullptr;
+    size_t     used  = 0;
+    Allocator* outer = 0;
+    Chunk*     next  = nullptr;
+    Chunk*     prev  = nullptr;
 };
 
 template<size_t N, typename T> struct Allocator<N, T>::Primary {
@@ -40,7 +40,8 @@ template<size_t N, typename T> struct Allocator<N, T>::Fallback {
     State   state; // unused
 };
 
-// template<size_t N, typename T> Allocator<N, T>::Allocator() { }
+// default
+template<size_t N, typename T> Allocator<N, T>::Allocator() { }
 
 template<size_t N, typename T> Allocator<N, T>::~Allocator() {
     Depot* list[3] = { &empty, &full, &partial };
