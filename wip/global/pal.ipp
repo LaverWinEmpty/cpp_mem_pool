@@ -19,8 +19,12 @@ CXX_INLINE void pal_pause() noexcept {
 }
 
 template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
-    byte  = bit_align(byte,  4096);
-    align = bit_align(align, 4096);
+    byte = bit_align(byte,  4096);
+
+    if constexpr(CHECK_TARGET(OS_WINDOWS))
+        align = bit_align(align, 65536); // VirtualAlloc need alignment of 64KiB
+    else align = bit_align(align, 4096);
+
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
         return nullptr; // invalid
@@ -133,7 +137,7 @@ void pal_vfree(void* ptr, size_t byte, size_t align) noexcept {
             uint32_t protect;
             uint32_t type;
         } info;
-        VirtualQuery(ptr, reinterpret_cast<void*>(&info), sizeof(info));
+        VirtualQuery(ptr, reinterpret_cast<MEMORY_BASIC_INFORMATION*>(&info), sizeof(info));
         ptr = info.allocated;
    }
    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
