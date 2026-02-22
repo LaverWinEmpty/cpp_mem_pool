@@ -18,13 +18,11 @@ CXX_INLINE void pal_pause() noexcept {
 #endif
 }
 
-template<> void* pal_valloc<void>(size_t in) noexcept {
-    static constexpr size_t ALIGNMENT = 64 * 1024;                    // 64KiB alignment
-    static constexpr size_t SAFETY    = size_t(-1) - (ALIGNMENT * 2); // protect overflow
-
-    //! @TODO:
-    const size_t BYTE = bit_align(in, 0); // 4KiB alignment, to byte
-    if(BYTE > SAFETY) {
+template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
+    byte  = bit_align(byte,  4096);
+    align = bit_align(align, 4096);
+    // protect overflow
+    if(byte > (~size_t(0) - (align * 2))) {
         return nullptr; // invalid
     }
     void* ptr = nullptr;
@@ -41,7 +39,7 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
             void*  l;
             void*  h;
             size_t n;
-        } addr = { NULL, NULL, ALIGNMENT };
+        } addr = { NULL, NULL, align };
 
         // MEM_EXTENDED_PARAMETER binary layout
         struct {
@@ -54,21 +52,21 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
         param.ptr = &addr;
 
         // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
-        return valloc2(GetCurrentProcess(), nullptr, BYTE, 0x1000 | 0x2000, 0x4, &param, 1);
+        return valloc2(GetCurrentProcess(), nullptr, byte, 0x1000 | 0x2000, 0x4, &param, 1);
     }
 
     // fallback
     // param: MEM_RESERVE, PAGE_NOACCESS
-    ptr = VirtualAlloc(nullptr, BYTE + ALIGNMENT, 0x2000, 0x1);
+    ptr = VirtualAlloc(nullptr, byte + align, 0x2000, 0x1);
     if(ptr) {
-        ptr = reinterpret_cast<void*>(bit_align(uint64_t(ptr), ALIGNMENT));
+        ptr = reinterpret_cast<void*>(bit_align(uint64_t(ptr), align));
         // param:  MEM_COMMIT, PAGE_READWIRTE
-        ptr = VirtualAlloc(ptr, BYTE, 0x1000, 0x4);
+        ptr = VirtualAlloc(ptr, byte, 0x1000, 0x4);
     }
     // else return nullptr
 
 #elif CHECK_TARGET(OS_POSIX)
-    const size_t ALLOC = bit_align(BYTE + ALIGNMENT, ALIGNMENT); // with address alignment size
+    const size_t ALLOC = bit_align(byte + align, align); // with address alignment size
 
     // use mmap: address are manually alinged to 64KiB
     ptr = mmap(NULL, ALLOC, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -77,28 +75,28 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
     }
 
     uintptr_t allocated = uintptr_t(ptr);                  // casting
-    uintptr_t aligned   = bit_align(allocated, ALIGNMENT); // 64KB align (ptr to return)
+    uintptr_t aligned   = bit_align(allocated, align); // 64KB align (ptr to return)
     uintptr_t moved     = aligned - allocated;             // moved
-    uintptr_t remained  = ALLOC - BYTE - moved;            // remained
+    uintptr_t remained  = ALLOC - byte - moved;            // remained
 
     if(moved) {
         munmap(ptr, moved); // trim front if aligned
     }
-    munmap(reinterpret_cast<char*>(aligned + BYTE), remained); // trim back
+    munmap(reinterpret_cast<char*>(aligned + byte), remained); // trim back
     ptr = reinterpret_cast<void*>(aligned);                    // position rollback
 
 #else
     // use default malloc
     void* src = nullptr; // real address
 
-    src = malloc(BYTE + ALIGNMENT + sizeof(void*)); // call malloc
+    src = malloc(byte + align + sizeof(void*)); // call malloc
     if(src) {
         // aligned pointer
-        ptr = reinterpret_cast<void*>(bit_align(reinterpret_cast<uintptr_t>(src), ALIGNMENT)); // first align
+        ptr = reinterpret_cast<void*>(bit_align(reinterpret_cast<uintptr_t>(src), align)); // first align
 
         // lack
         if(ptrdiff_t(reinterpret_cast<char*>(ptr) - reinterpret_cast<char*>(src)) < sizeof(void*)) {
-            ptr = reinterpret_cast<char*>(ptr) + ALIGNMENT; // second align: make space for metadata pointer
+            ptr = reinterpret_cast<char*>(ptr) + align; // second align: make space for metadata pointer
         }
 
         // embed source address
@@ -109,11 +107,15 @@ template<> void* pal_valloc<void>(size_t in) noexcept {
     return ptr;
 }
 
-template<typename T> T* pal_valloc(size_t in) noexcept {
-    return static_cast<T*>(pal_valloc<void>(in));
+template<typename T> T* pal_valloc(size_t byte, size_t align) noexcept {
+#if CPP_VER >= CPP_17
+        return std::launder(static_cast<T*>(pal_valloc<void>(byte, align)));
+#else
+        return static_cast<T*>(pal_valloc<void>(byte, align));
+#endif
 }
 
-void pal_vfree(void* ptr, size_t in) noexcept {
+void pal_vfree(void* ptr, size_t byte, size_t align) noexcept {
     if(!ptr) return;
 
 #if CHECK_TARGET(OS_WINDOWS)
@@ -135,8 +137,10 @@ void pal_vfree(void* ptr, size_t in) noexcept {
         ptr = info.allocated;
    }
    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
+
 #elif CHECK_TARGET(OS_POSIX)
-    munmap(ptr, bit_align(ptr, 4096)); // alignment to 4096
+    munmap(ptr, bit_align(byte, align)); // alignment to 4096
+
 #else
     free(*(reinterpret_cast<void**>(ptr) - 1));
 #endif
