@@ -18,11 +18,13 @@ template<size_t = 0, typename = void> class Allocator;
 template<typename T> class Allocator<0, T> {
     Allocator() = delete;
 public:
-    static constexpr size_t aligner(size_t n) {
+    static constexpr size_t sizer(size_t n) {
+        if constexpr (std::is_same_v<T, void>) {
+            return 0; // [visible confusion]
+        }
         return global::num_align(sizeof(T), global::bit_pow2(n));
     }
 };
-
 
 //! @brief non-aligned size allocator
 template<size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>>
