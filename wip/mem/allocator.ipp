@@ -1,15 +1,15 @@
-#ifndef MEM_SLAB_HPP
-#    include "slab.hpp"
+#ifndef MEM_Allocator_HPP
+#    include "allocator.hpp"
 #endif
 
-template<size_t N> struct Slab<N>::Meta {
+template<size_t N, typename T> struct Allocator<N, T>::Meta {
     size_t used  = 0;
-    Slab*  outer = 0;
+    Allocator*  outer = 0;
     Chunk* next  = nullptr;
     Chunk* prev  = nullptr;
 };
 
-template<size_t N> struct Slab<N>::Primary {
+template<size_t N, typename T> struct Allocator<N, T>::Primary {
     //! @tparam chunk size byte
     //! @brief the block total bits / data + flag bits
     static constexpr size_t COUNT = (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
@@ -19,7 +19,7 @@ template<size_t N> struct Slab<N>::Primary {
 
     //! @brief [ meta | state | PADDING | data ]
     static constexpr size_t OFFSET  = ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
-    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));   
+    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));
 
     // size check
     static_assert((sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
@@ -29,7 +29,7 @@ template<size_t N> struct Slab<N>::Primary {
     uint8_t data[CHUNK - sizeof(meta) - sizeof(state)];
 };
 
-template<size_t N> struct Slab<N>::Fallback {
+template<size_t N, typename T> struct Allocator<N, T>::Fallback {
     static constexpr size_t COUNT  = 1;
     static constexpr size_t OFFSET = 0;
 
@@ -40,9 +40,9 @@ template<size_t N> struct Slab<N>::Fallback {
     State   state; // unused
 };
 
-// template<size_t N> Slab<N>::Slab() { }
+// template<size_t N, typename T> Allocator<N, T>::Allocator() { }
 
-template<size_t N> Slab<N>::~Slab() {
+template<size_t N, typename T> Allocator<N, T>::~Allocator() {
     Depot* list[3] = { &empty, &full, &partial };
     for(int i = 0; i < 3; ++i) {
         Depot* depot = list[i];
@@ -59,8 +59,8 @@ template<size_t N> Slab<N>::~Slab() {
     }
 }
 
-template<size_t N>
-template<typename T, typename... Args> T* Slab<N>::acquire(Args&&... in) noexcept {
+template<size_t N, typename T>
+template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in) noexcept {
     if constexpr(N == 0) {
         return nullptr;
     }
@@ -95,7 +95,7 @@ template<typename T, typename... Args> T* Slab<N>::acquire(Args&&... in) noexcep
     --counter; // count
 
     // call constructor
-    if constexpr(std::is_same_v<T, void> == false) {
+    if constexpr(std::is_same_v<T, T> == false) {
         if constexpr(sizeof...(Args) != 0) {
             return new(out) T(std::forward<Args>(in)...);
         }
@@ -104,10 +104,10 @@ template<typename T, typename... Args> T* Slab<N>::acquire(Args&&... in) noexcep
     return out;
 }
 
-template<size_t N>
-template<typename T> void Slab<N>::release(T* in) {
+template<size_t N, typename T>
+template<typename U> void Allocator<N, T>::release(U* in) {
     // call destrcutor
-    if constexpr(std::is_same_v<T, void> == false) {
+    if constexpr(std::is_same_v<T, T> == false) {
         in->~T();
     }
 
@@ -152,8 +152,8 @@ template<typename T> void Slab<N>::release(T* in) {
     ++counter;
 }
 
-template<size_t N>
-size_t Slab<N>::reserve(size_t cnt) {
+template<size_t N, typename T>
+size_t Allocator<N, T>::reserve(size_t cnt) {
     if(cnt == 0) return 0;       // no reserve
     if(counter >= cnt) return 0; // reserved
 
@@ -170,8 +170,8 @@ size_t Slab<N>::reserve(size_t cnt) {
     return generated; // create count
 }
 
-template<size_t N>
-size_t Slab<N>::shrink() {
+template<size_t N, typename T>
+size_t Allocator<N, T>::shrink() {
     size_t cnt = 0;
     Chunk* del = full.pop(); // pop
 
@@ -184,7 +184,7 @@ size_t Slab<N>::shrink() {
     return cnt;
 }
 
-template<size_t N> auto Slab<N>::generate() noexcept -> Chunk* {
+template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chunk* {
     Chunk* ptr;
 
     // HUGE CHUNK does not require align
@@ -204,7 +204,7 @@ template<size_t N> auto Slab<N>::generate() noexcept -> Chunk* {
     return ptr;
 }
 
-template<size_t N> void Slab<N>::destroy(Chunk* in) noexcept {
+template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept {
     in->~Chunk();
 
     // matches the parameter when pal_valloc is called
@@ -216,7 +216,7 @@ template<size_t N> void Slab<N>::destroy(Chunk* in) noexcept {
     counter -= Chunk::COUNT;
 }
 
-template<size_t N> void Slab<N>::Depot::remove(Chunk* in) {
+template<size_t N, typename T> void Allocator<N, T>::Depot::remove(Chunk* in) {
     Chunk* prev = in->meta.prev;
     Chunk* next = in->meta.next;
     if(prev) prev->meta.next = next;
@@ -224,7 +224,7 @@ template<size_t N> void Slab<N>::Depot::remove(Chunk* in) {
     if(in == head) head = next;
 }
 
-template<size_t N> void Slab<N>::Depot::push(Chunk* in) {
+template<size_t N, typename T> void Allocator<N, T>::Depot::push(Chunk* in) {
     in->meta.prev = nullptr;
     in->meta.next = head; // push front
     if(head) {
@@ -233,7 +233,7 @@ template<size_t N> void Slab<N>::Depot::push(Chunk* in) {
     head = in; // new head
 }
 
-template<size_t N> auto Slab<N>::Depot::pop() -> Chunk* {
+template<size_t N, typename T> auto Allocator<N, T>::Depot::pop() -> Chunk* {
     Chunk* out = head;
     if(out) {
         head           = out->meta.next;

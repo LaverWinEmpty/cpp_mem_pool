@@ -1,5 +1,5 @@
-#ifndef MEM_SLAB_HPP
-#define MEM_SLAB_HPP
+#ifndef MEM_ALLOCATOR_HPP
+#define MEM_ALLOCATOR_HPP
 
 #include "../core/mask.hpp"
 #include "../global/pal.hpp"
@@ -8,8 +8,36 @@
 #include <utility>
 #include <type_traits>
 
-//! @brief Allocator base
-template<size_t N> class Slab {
+template<size_t = 0, typename = void> class Allocator;
+
+//! @brief Allocator size aligner
+//! @note  N = 0 is not allowed
+//!        but declaration is allowed
+//!        and use it as a helper
+template<typename T> class Allocator<0, T> {
+public:
+    static constexpr size_t aligner(size_t n) {
+        return (n + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+    }
+
+private:
+    Allocator() = delete;
+};
+
+//! @brief non-aligned size allocator
+template <size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>> :
+    public Allocator<Allocator<>::aligner(N)> {
+    using Base = Allocator<Allocator<>::aligner(N)>;
+
+public:
+    Allocator(): Base() {}
+};
+
+//! @brief pre-aligned size allocator
+template<size_t N, typename> class Allocator {
+public:
+    using Base = void; // if void then not align N
+
 public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
 
@@ -29,20 +57,20 @@ public:
             (global::bit_pow2(N * 15) <= 65536 ? 65536 : // SMALL:  fixed 64KiB, default
                  (global::bit_pow2(N * 15))              // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
-    static constexpr size_t UNIT  = Chunk::COUNT;
+    static constexpr size_t UNIT = Chunk::COUNT;
 
 public:
     /**
      * @brief constructor
      */
-    Slab() = default;
+    Allocator() = default;
 
 public:
     /**
      * @brief destructor
      * @throw when chunk in use on debug
      */
-    ~Slab();
+    ~Allocator();
 
 public:
     /**
@@ -118,5 +146,5 @@ private:
     void destroy(Chunk*) noexcept;
 };
 
-#include "Slab.ipp"
+#include "allocator.ipp"
 #endif
