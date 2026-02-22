@@ -12,17 +12,17 @@ template<size_t N> struct Slab<N>::Meta {
 template<size_t N> struct Slab<N>::Primary {
     //! @tparam chunk size byte
     //! @brief the block total bits / data + flag bits
-    static constexpr size_t COUNT = (CHUNK - sizeof(Meta)) * 8 / (N * 8 + 1);
+    static constexpr size_t COUNT = (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
 
     //! @brief object count to byte, divied to sizeof(uint_64), and round up
     using State = core::Mask<(COUNT + 63) / 64>;
 
     //! @brief [ meta | state | PADDING | data ]
-    static constexpr size_t OFFSET  = global::bit_align(sizeof(Meta) + sizeof(State), N);
-    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));
+    static constexpr size_t OFFSET  = ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
+    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));   
 
     // size check
-    static_assert((sizeof(Meta) + sizeof(State) + PADDING + N * COUNT) <= CHUNK);
+    static_assert((sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
 
     Meta    meta;
     State   state;
@@ -35,7 +35,7 @@ template<size_t N> struct Slab<N>::Fallback {
 
     using State = core::Mask<1>; // unused
 
-    uint8_t data[N];
+    uint8_t data[CHUNK];
     Meta    meta;
     State   state; // unused
 };
@@ -84,7 +84,7 @@ template<typename T, typename... Args> T* Slab<N>::acquire(Args&&... in) noexcep
     current->state.on(index);
 
     // return
-    void* out = reinterpret_cast<uint8_t*>(current) + Chunk::OFFSET + index * N;
+    void* out = reinterpret_cast<uint8_t*>(current) + Chunk::OFFSET + index * BLOCK;
 
     // get meta, and MAX to index
     // usage partial -> empty
@@ -128,7 +128,7 @@ template<typename T> void Slab<N>::release(T* in) {
         chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~MASK); // known UB but safe in practice
 
         // calculate index of the block within the chunk
-        index = ((uintptr_t(in) - Chunk::OFFSET) & MASK) / N; // optimize by compiler
+        index = ((uintptr_t(in) - Chunk::OFFSET) & MASK) / BLOCK; // optimize by compiler
     }
 
     // check pool
@@ -189,7 +189,7 @@ template<size_t N> auto Slab<N>::generate() noexcept -> Chunk* {
 
     // HUGE CHUNK does not require align
     if constexpr(HUGE) {
-        ptr = (Chunk*)global::pal_valloc(N + PAGE, PAGE); // HUGE: aligned to 4KiB
+        ptr = (Chunk*)global::pal_valloc(BLOCK + PAGE, PAGE); // HUGE: aligned to 4KiB
     }
     else ptr = (Chunk*)global::pal_valloc(CHUNK, CHUNK); // other: aligned to CHUNK
 
@@ -209,7 +209,7 @@ template<size_t N> void Slab<N>::destroy(Chunk* in) noexcept {
 
     // matches the parameter when pal_valloc is called
     if constexpr(HUGE) {
-        global::pal_vfree(in, N + PAGE, PAGE); // HUGE: aligned to 4KiB
+        global::pal_vfree(in, BLOCK + PAGE, PAGE); // HUGE: aligned to 4KiB
     }
     else global::pal_vfree(in, CHUNK, CHUNK); // other: aligned to CHUNK
 

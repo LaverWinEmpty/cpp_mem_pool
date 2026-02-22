@@ -10,9 +10,12 @@
 
 //! @brief Allocator base
 template<size_t N> class Slab {
+public:
+    static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
+
 private:
+    static constexpr bool   HUGE = BLOCK >= (1 << 20); // 1MiB
     static constexpr size_t PAGE = 4096;
-    static constexpr bool   HUGE = N >= (1 << 20); // 1MiB
 
 private:
     struct Meta;     //!< metadata, header
@@ -26,7 +29,7 @@ public:
             (global::bit_pow2(N * 15) <= 65536 ? 65536 : // SMALL:  fixed 64KiB, default
                  (global::bit_pow2(N * 15))              // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
-    static constexpr size_t UNIT = Chunk::COUNT;
+    static constexpr size_t UNIT  = Chunk::COUNT;
 
 public:
     /**
