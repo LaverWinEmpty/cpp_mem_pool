@@ -102,7 +102,7 @@ template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in)
         }
         else return new(out) T();
     }
-    return out;
+    return static_cast<U*>(out);
 }
 
 template<size_t N, typename T>

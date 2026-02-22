@@ -3,6 +3,7 @@
 
 #include "../core/mask.hpp"
 #include "../global/pal.hpp"
+#include "../global/num.hpp"
 #include <cassert>
 #include <cstdlib>
 #include <utility>
@@ -15,15 +16,17 @@ template<size_t = 0, typename = void> class Allocator;
 //!        but declaration is allowed
 //!        and use it as a helper
 template<typename T> class Allocator<0, T> {
-public:
-    static constexpr size_t aligner(size_t n) { return (n + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
-private:
     Allocator() = delete;
+public:
+    static constexpr size_t aligner(size_t n) {
+        return global::num_align(sizeof(T), global::bit_pow2(n));
+    }
 };
+
 
 //! @brief non-aligned size allocator
 template<size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>>
-    : public Allocator<Allocator<>::aligner(N)> { };
+    : public Allocator<global::num_align(N, sizeof(void*))> { };
 
 //! @brief pre-aligned size allocator
 template<size_t N, typename> class Allocator {
