@@ -3,6 +3,7 @@
 
 #include <new>
 
+#include "internal/config.h"
 #include "internal/target.h"
 
 // WIN libraries
@@ -40,7 +41,7 @@ CXX_INLINE void pal_pause() noexcept;
  * @param [in] align address alignment, value will be aligned to 64KiB, follow Windows policy
  * @return a chunk whose address is aligned
  */
-template<typename T = void> T* pal_valloc(size_t byte = 16384, size_t align = 65536) noexcept;
+template<typename T = void> T* pal_valloc(size_t byte = PAL_PAGE, size_t align = PAL_BOUNDARY) noexcept;
 
 /**
  * @brief call VirtualFree or unmap

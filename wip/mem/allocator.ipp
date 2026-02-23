@@ -123,7 +123,7 @@ template<typename U> void Allocator<N, T>::release(U* in) {
         index = 0;                            // fallback: chunk == block
     }
     else {
-        static constexpr size_t MASK = CHUNK - 1; // if CHUNK 65536 then operate by 0xFFFF
+        static constexpr size_t MASK = CHUNK - 1; // e.g. if CHUNK 65536 then operate by 0xFFFF
 
         // find chunk begin address
         chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~MASK); // known UB but safe in practice
@@ -184,7 +184,7 @@ size_t Allocator<N, T>::shrink() {
     }
 
     // all clear
-    if constexpr (HUGE) {
+    if constexpr(HUGE) {
         if(current) {
             destroy(current);
             current = nullptr;
@@ -200,7 +200,7 @@ template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chun
 
     // HUGE CHUNK does not require align
     if constexpr(HUGE) {
-        ptr = (Chunk*)global::pal_valloc(BLOCK + PAGE, PAGE); // HUGE: aligned to 4KiB
+        ptr = (Chunk*)global::pal_valloc(BLOCK + global::PAL_PAGE, global::PAL_PAGE); // HUGE: aligned to page
     }
     else ptr = (Chunk*)global::pal_valloc(CHUNK, CHUNK); // other: aligned to CHUNK
 
@@ -220,7 +220,7 @@ template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept
 
     // matches the parameter when pal_valloc is called
     if constexpr(HUGE) {
-        global::pal_vfree(in, BLOCK + PAGE, PAGE); // HUGE: aligned to 4KiB
+        global::pal_vfree(in, BLOCK + global::PAL_PAGE, global::PAL_PAGE); // HUGE: aligned to page
     }
     else global::pal_vfree(in, CHUNK); // other: aligned to CHUNK
 

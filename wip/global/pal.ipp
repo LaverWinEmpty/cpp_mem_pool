@@ -19,8 +19,8 @@ CXX_INLINE void pal_pause() noexcept {
 }
 
 template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
-    byte  = bit_align(byte,  16384);           // aligned to 16KiB
-    align = bit_pow2(bit_align(align, 65536)); // align to 64KiB to power of 2
+    byte  = bit_align(byte, PAL_PAGE);                // aligned to 16KiB
+    align = bit_pow2(bit_align(align, PAL_BOUNDARY)); // align to 64KiB to power of 2
 
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
@@ -32,7 +32,7 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
     static auto valloc2 =
         (void*(__stdcall*)(void*, void*, size_t, uint32_t, uint32_t, void*, uint32_t))
         GetProcAddress(GetModuleHandleA("kernelbase.dll"), "VirtualAlloc2");
-
+        
     // check callable VirtualAlloc2
     if(valloc2) {
         // MEM_ADDRESS_REQUREMENTS binary layout
@@ -49,7 +49,7 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
                 uint64_t n;
                 void*    ptr;
             };
-        } param = { 1, 0 };
+        } param   = { 1, 0 };
         param.ptr = &addr;
 
         // MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE
@@ -110,9 +110,9 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
 
 template<typename T> T* pal_valloc(size_t byte, size_t align) noexcept {
 #if CPP_VER >= CPP_17
-        return std::launder(static_cast<T*>(pal_valloc<void>(byte, align)));
+    return std::launder(static_cast<T*>(pal_valloc<void>(byte, align)));
 #else
-        return static_cast<T*>(pal_valloc<void>(byte, align));
+    return static_cast<T*>(pal_valloc<void>(byte, align));
 #endif
 }
 
@@ -122,7 +122,7 @@ void pal_vfree(void* ptr, size_t byte) noexcept {
 #if CHECK_TARGET(OS_WINDOWS)
     static bool is2 = GetProcAddress(GetModuleHandleA("kernelbase.dll"), "VirtualAlloc2") != nullptr;
 
-   if(!is2) {
+    if(!is2) {
         // MEMORY_BASIC_INFORMATION binary layout
         struct {
             void*    base;
@@ -136,11 +136,11 @@ void pal_vfree(void* ptr, size_t byte) noexcept {
         } info;
         VirtualQuery(ptr, reinterpret_cast<MEMORY_BASIC_INFORMATION*>(&info), sizeof(info));
         ptr = info.allocated;
-   }
-   VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
+    }
+    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 
 #elif CHECK_TARGET(OS_POSIX)
-    munmap(ptr, bit_align(byte, 16384)); // alignment to 16KiB
+    munmap(ptr, bit_align(byte, PAL_PAGE)); // alignment to 16KiB
 
 #else
     free(*(reinterpret_cast<void**>(ptr) - 1));

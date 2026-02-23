@@ -8,14 +8,7 @@
 // macors
 #include "target.h"
 
-// WIN libraries
-#if CHECK_TARGET(OS_WINDOWS)
-#    include <intrin.h>
-#endif
-
-// POSIX libraries
-#if CHECK_TARGET(OS_POSIX)
-#    include <sys/mman.h>
-#endif
+// constants
+#include "config.h"
 
 #endif

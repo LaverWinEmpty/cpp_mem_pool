@@ -19,7 +19,7 @@ template<typename T> class Allocator<0, T> {
     Allocator() = delete;
 public:
     static constexpr size_t sizer(size_t n) {
-        if constexpr (std::is_same_v<T, void>) {
+        if constexpr(std::is_same_v<T, void>) {
             return 0; // [visible confusion]
         }
         return global::num_align(sizeof(T), global::bit_pow2(n));
@@ -36,8 +36,7 @@ public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
 
 private:
-    static constexpr bool   HUGE = BLOCK >= (1 << 20); // 1MiB
-    static constexpr size_t PAGE = 16384;              // 16KiB
+    static constexpr bool HUGE = BLOCK >= (1 << 20); // 1MiB
 
 private:
     struct Meta;     //!< metadata, header
@@ -47,9 +46,9 @@ private:
 public:
     using Chunk = std::conditional_t<HUGE, Fallback, Primary>;
     static constexpr size_t CHUNK =
-        HUGE ? N + PAGE :                                // HUGE:   fallback: 1 chunk as 1 block, with meta
-            (global::bit_pow2(N * 15) <= 65536 ? 65536 : // SMALL:  fixed 64KiB, default
-                 (global::bit_pow2(N * 15))              // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
+        HUGE ? N + global::PAL_PAGE : // HUGE: fallback: 1 chunk as 1 block, with meta
+            (global::bit_pow2(N * 15) > global::PAL_BOUNDARY ? global::PAL_BOUNDARY : // SMALL: fixed 64KiB, default
+                 (global::bit_pow2(N * 15)) // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
     static constexpr size_t UNIT = Chunk::COUNT;
 
