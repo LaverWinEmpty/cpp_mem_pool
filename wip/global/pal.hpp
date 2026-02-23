@@ -44,11 +44,10 @@ template<typename T = void> T* pal_valloc(size_t byte = 65536, size_t align = 40
 
 /**
  * @brief call VirtualFree or unmap
- * @param [in] ptr pointer from valloc
- * @param [in] in  OPTIONAL: need only POSIX: default 65536, same size used when calling valloc
- * @param [in] in  OPTIONAL: need only POSIX: default 4096, same size used when calling valloc
+ * @param [in] ptr  pointer from valloc
+ * @param [in] byte OPTIONAL: need only POSIX: default 65536, same size used when calling valloc
  */
-void pal_vfree(void* in, size_t byte = 65536, size_t align = 4096) noexcept;
+void pal_vfree(void* ptr, size_t byte = 65536) noexcept;
 
 } // namespace global
 

@@ -25,7 +25,7 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
         align = bit_align(align, 65536); // VirtualAlloc need alignment of 64KiB
     else align = bit_align(align, 4096);
     align = bit_pow2(align); // to power of 2
-    
+
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
         return nullptr; // invalid
@@ -120,7 +120,7 @@ template<typename T> T* pal_valloc(size_t byte, size_t align) noexcept {
 #endif
 }
 
-void pal_vfree(void* ptr, size_t byte, size_t align) noexcept {
+void pal_vfree(void* ptr, size_t byte) noexcept {
     if(!ptr) return;
 
 #if CHECK_TARGET(OS_WINDOWS)
@@ -144,7 +144,7 @@ void pal_vfree(void* ptr, size_t byte, size_t align) noexcept {
    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 
 #elif CHECK_TARGET(OS_POSIX)
-    munmap(ptr, bit_align(byte, align)); // alignment to 4096
+    munmap(ptr, bit_align(byte, 4096)); // alignment to 4096
 
 #else
     free(*(reinterpret_cast<void**>(ptr) - 1));
