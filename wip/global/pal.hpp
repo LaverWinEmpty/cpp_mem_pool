@@ -3,6 +3,8 @@
 
 #include <new>
 
+#include "internal/target.h"
+
 // WIN libraries
 #if CHECK_TARGET(OS_WINDOWS)
 #    include <intrin.h>
@@ -13,7 +15,6 @@
 #    include <sys/mman.h>
 #endif
 
-#include "internal/target.h"
 #include "bit.hpp"
 
 /**************************************************************************************************

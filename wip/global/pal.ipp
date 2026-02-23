@@ -24,7 +24,8 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
     if constexpr(CHECK_TARGET(OS_WINDOWS))
         align = bit_align(align, 65536); // VirtualAlloc need alignment of 64KiB
     else align = bit_align(align, 4096);
-
+    align = bit_pow2(align); // to power of 2
+    
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
         return nullptr; // invalid
