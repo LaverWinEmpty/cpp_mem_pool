@@ -66,7 +66,7 @@ constexpr uint64_t bit_pow2(uint64_t in) noexcept {
     // 0x10 -> 0x0F -> get count 60 -> (1 << (64 - 60)) = 0x10
     int shift = (64 - bit_clz(in - 1));
 
-    return shift >= 64 ? 0 : uint64_t(1) << shift;
+    return shift >= 64 ? uint64_t(-1) : uint64_t(1) << shift;
 }
 
 constexpr int bit_log2(uint64_t in) noexcept {
@@ -75,7 +75,8 @@ constexpr int bit_log2(uint64_t in) noexcept {
 }
 
 constexpr uint64_t bit_align(uint64_t in, uint64_t unit) noexcept {
-    if(unit <= 1) return in;
+    if(unit == 0) return uint64_t(-1);
+    if(in <= unit) return unit;
     if(bit_aligned(unit)) {
         return (in + unit - 1) & ~(unit - 1);
     }
