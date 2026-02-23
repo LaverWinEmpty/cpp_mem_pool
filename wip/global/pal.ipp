@@ -19,12 +19,8 @@ CXX_INLINE void pal_pause() noexcept {
 }
 
 template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
-    byte = bit_align(byte,  4096);
-
-    if constexpr(CHECK_TARGET(OS_WINDOWS))
-        align = bit_align(align, 65536); // VirtualAlloc need alignment of 64KiB
-    else align = bit_align(align, 4096);
-    align = bit_pow2(align); // to power of 2
+    byte  = bit_align(byte,  16384);           // aligned to 16KiB
+    align = bit_pow2(bit_align(align, 65536)); // align to 64KiB to power of 2
 
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
@@ -79,10 +75,10 @@ template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
         return nullptr;
     }
 
-    uintptr_t allocated = uintptr_t(ptr);                  // casting
+    uintptr_t allocated = uintptr_t(ptr);              // casting
     uintptr_t aligned   = bit_align(allocated, align); // 64KB align (ptr to return)
-    uintptr_t moved     = aligned - allocated;             // moved
-    uintptr_t remained  = ALLOC - byte - moved;            // remained
+    uintptr_t moved     = aligned - allocated;         // moved
+    uintptr_t remained  = ALLOC - byte - moved;        // remained
 
     if(moved) {
         munmap(ptr, moved); // trim front if aligned
@@ -144,7 +140,7 @@ void pal_vfree(void* ptr, size_t byte) noexcept {
    VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 
 #elif CHECK_TARGET(OS_POSIX)
-    munmap(ptr, bit_align(byte, 4096)); // alignment to 4096
+    munmap(ptr, bit_align(byte, 16384)); // alignment to 16KiB
 
 #else
     free(*(reinterpret_cast<void**>(ptr) - 1));

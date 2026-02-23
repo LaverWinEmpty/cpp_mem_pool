@@ -36,22 +36,23 @@ CXX_INLINE void pal_pause() noexcept;
  * @brief call VirtualAlloc or mmap
  *
  * @tparam T type of the returned pointer
- * @param [in] byte  allocate size, value will be aligned to 4096
- * @param [in] align allocate alignment, value will be aligned to (POSIX: 4096 / WIN: 65536)
- * @return a chunk whose address is aligned to 64 KiB (nullptr if failed)
+ * @param [in] byte  allocate size, value will be aligned to 16KiB, for follow Apple policy
+ * @param [in] align address alignment, value will be aligned to 64KiB, follow Windows policy
+ * @return a chunk whose address is aligned
  */
-template<typename T = void> T* pal_valloc(size_t byte = 65536, size_t align = 4096) noexcept;
+template<typename T = void> T* pal_valloc(size_t byte = 16384, size_t align = 65536) noexcept;
 
 /**
  * @brief call VirtualFree or unmap
  * @param [in] ptr  pointer from valloc
- * @param [in] byte OPTIONAL: need only POSIX: default 65536, same size used when calling valloc
+ * @param [in] byte OPTIONAL: need only POSIX: default 16384, same size used when calling valloc
  */
-void pal_vfree(void* ptr, size_t byte = 65536) noexcept;
+void pal_vfree(void* ptr, size_t byte = 16384) noexcept;
 
 } // namespace global
 
 //! @NOTE: like as "Windows.h"
+
 #if CHECK_TARGET(OS_WINDOWS)
 extern "C" {
     //__declspec(dllimport) void* __stdcall GetCurrentProcess();
