@@ -222,7 +222,7 @@ template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept
     if constexpr(HUGE) {
         global::pal_vfree(in, BLOCK + PAGE, PAGE); // HUGE: aligned to 4KiB
     }
-    else global::pal_vfree(in, CHUNK, CHUNK); // other: aligned to CHUNK
+    else global::pal_vfree(in, CHUNK); // other: aligned to CHUNK
 
     counter -= Chunk::COUNT;
 }

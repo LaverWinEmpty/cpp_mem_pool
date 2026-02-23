@@ -37,7 +37,7 @@ public:
 
 private:
     static constexpr bool   HUGE = BLOCK >= (1 << 20); // 1MiB
-    static constexpr size_t PAGE = 4096;
+    static constexpr size_t PAGE = 16384;              // 16KiB
 
 private:
     struct Meta;     //!< metadata, header
