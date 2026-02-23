@@ -3,8 +3,14 @@
 
 #include <new>
 
-#if TARGET_OS == OS_WINDOWS
+// WIN libraries
+#if CHECK_TARGET(OS_WINDOWS)
 #    include <intrin.h>
+#endif
+
+// POSIX libraries
+#if CHECK_TARGET(OS_POSIX)
+#    include <sys/mman.h>
 #endif
 
 #include "internal/target.h"

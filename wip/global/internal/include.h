@@ -8,9 +8,14 @@
 // macors
 #include "target.h"
 
-// OS libraries
+// WIN libraries
 #if CHECK_TARGET(OS_WINDOWS)
 #    include <intrin.h>
+#endif
+
+// POSIX libraries
+#if CHECK_TARGET(OS_POSIX)
+#    include <sys/mman.h>
 #endif
 
 #endif
