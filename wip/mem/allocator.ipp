@@ -182,6 +182,16 @@ size_t Allocator<N, T>::shrink() {
         del = temp;               // set next
         ++cnt;
     }
+
+    // all clear
+    if constexpr (HUGE) {
+        if(current) {
+            destroy(current);
+            current = nullptr;
+            ++cnt;
+        }
+    }
+
     return cnt;
 }
 
