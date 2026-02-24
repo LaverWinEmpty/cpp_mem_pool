@@ -3,8 +3,9 @@
 
 namespace global {
 
-static constexpr size_t PAL_PAGE     = 16384; //!< memory page allocate unit (multiple of) 16 KiB
-static constexpr size_t PAL_BOUNDARY = 65536; //!< memory page alignment unit (power of 2) 64 KiB
+static constexpr size_t PAL_PAGE     = 1 << 14; //!< 16 KiB: memory page allocate unit (multiple of)
+static constexpr size_t PAL_BOUNDARY = 1 << 16; //!< 64 KiB: memory page alignment unit (power of 2)
+static constexpr size_t PAL_HUGEPAGE = 1 << 21; //!<  2 MiB: memory page large baseline (multiple of)
 
 } // namespace global
 #endif

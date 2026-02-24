@@ -19,8 +19,14 @@ CXX_INLINE void pal_pause() noexcept {
 }
 
 template<> void* pal_valloc<void>(size_t byte, size_t align) noexcept {
-    byte  = bit_align(byte, PAL_PAGE);                // aligned to 16KiB
-    align = bit_pow2(bit_align(align, PAL_BOUNDARY)); // align to 64KiB to power of 2
+    if(byte >= PAL_HUGEPAGE) {
+        byte = bit_align(byte, PAL_HUGEPAGE);             // aligned to 2MiB
+        align = bit_pow2(bit_align(align, PAL_HUGEPAGE)); // aligned to 2MiB to power of 2
+    }
+    else {
+        byte = bit_align(byte, PAL_PAGE);                 // aligned to 16KiB
+        align = bit_pow2(bit_align(align, PAL_BOUNDARY)); // align to 64KiB to power of 2
+    } 
 
     // protect overflow
     if(byte > (~size_t(0) - (align * 2))) {
@@ -140,7 +146,11 @@ void pal_vfree(void* ptr, size_t byte) noexcept {
     VirtualFree(ptr, 0, 0x8000); // param: MEM_RELEASE
 
 #elif CHECK_TARGET(OS_POSIX)
-    munmap(ptr, bit_align(byte, PAL_PAGE)); // alignment to 16KiB
+    if(byte >= PAL_HUGEPAGE) {
+        byte = bit_align(byte, PAL_HUGEPAGE);
+    }
+    else byte = bit_align(byte, PAL_PAGE); 
+    munmap(ptr, byte); // aligned to 16KiB or 2MiB
 
 #else
     free(*(reinterpret_cast<void**>(ptr) - 1));
