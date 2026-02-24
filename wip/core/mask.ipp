@@ -4,6 +4,15 @@
 
 namespace core {
 
+template<> class Mask<0> {
+public:
+    Mask<0>& on(uint64_t)      { return *this; }
+    Mask<0>& off(uint64_t)     { return *this; }
+    Mask<0>& toggle(uint64_t)  { return *this; }
+    bool check(uint64_t) const { return false; }
+    size_t next() const        { return -1; }
+};
+
 template<size_t N> Mask<N>& Mask<N>::on(uint64_t index) {
     flags[index >> 6] |= (1ull << uint64_t(index & (64 - 1))); // [index / 64] |= index % 64
     return *this;

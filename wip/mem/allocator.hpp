@@ -36,17 +36,17 @@ public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
 
 private:
-    static constexpr bool HUGE = BLOCK >= (1 << 20); // 1MiB
+    static constexpr bool HUGE = BLOCK >= global::PAL_HUGEPAGE;
 
 private:
-    struct Meta;     //!< metadata, header
-    struct Primary;  //!< default chunk structure
-    struct Fallback; //!< huge data chunk structure
+    struct Meta;   //!< metadata, header
+    struct Chunk;  //!< chunk
+    struct List;   //!< chunk single linked list
+    struct Vector; //!< chunk pointer vector (for huge)
 
 public:
-    using Chunk = std::conditional_t<HUGE, Fallback, Primary>;
     static constexpr size_t CHUNK =
-        HUGE ? N + global::PAL_PAGE : // HUGE: fallback: 1 chunk as 1 block, with meta
+        HUGE ? BLOCK : // HUGE: fallback: 1 chunk as 1 block, with meta
             (global::bit_pow2(N * 15) <= global::PAL_BOUNDARY ? global::PAL_BOUNDARY : // SMALL: fixed 64KiB, default
                  (global::bit_pow2(N * 15)) // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
@@ -56,7 +56,7 @@ public:
     /**
      * @brief constructor
      */
-    Allocator();
+    Allocator() = default;
 
 public:
     /**
@@ -110,25 +110,16 @@ public:
 public:
     size_t usable() { return counter; }
 
+private:
+    using Stack = std::conditional_t<BLOCK < global::PAL_HUGEPAGE, List, Vector>;
+
+    Stack full;    //!< chunks using block is 0
+    Stack empty;   //!< chunks using block is full
+    Stack partial; //!< chunks using block is ?
 
 private:
-    //! @brief chunk single linked list
-    struct Depot {
-        void   remove(Chunk*);
-        void   push(Chunk*);
-        Chunk* pop();
-
-        Chunk* head = nullptr;
-    };
-
-private:
-    Depot full;    //!< chunks using block is 0
-    Depot empty;   //!< chunks using block is full
-    Depot partial; //!< chunks using block is ?
-
-private:
-    Chunk* current;     //!< using chunk
-    size_t counter = 0; //!< usable block counter
+    Chunk* current = nullptr; //!< using chunk
+    size_t counter = 0;       //!< usable block counter
 
 private:
     //! @brief syscall allocate

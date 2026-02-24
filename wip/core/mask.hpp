@@ -37,12 +37,6 @@ public:
 
 public:
     /**
-     * @return get flags count
-     */
-    size_t count() const;
-
-public:
-    /**
      * @return first index, -1 is not found
      */
     size_t next() const;

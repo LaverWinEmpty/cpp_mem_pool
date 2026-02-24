@@ -9,48 +9,34 @@ template<size_t N, typename T> struct Allocator<N, T>::Meta {
     Chunk*     prev  = nullptr;
 };
 
-template<size_t N, typename T> struct Allocator<N, T>::Primary {
+template<size_t N, typename T> struct Allocator<N, T>::Chunk {
     //! @tparam chunk size byte
     //! @brief the block total bits / data + flag bits
-    static constexpr size_t COUNT = (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
+    static constexpr size_t COUNT = HUGE ? 1 : (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
 
     //! @brief object count to byte, divied to sizeof(uint_64), and round up
-    using State = core::Mask<(COUNT + 63) / 64>;
+    using State = std::conditional_t<HUGE, core::Mask<0>, core::Mask<(COUNT + 63) / 64>>;
 
     //! @brief [ meta | state | PADDING | data ]
-    static constexpr size_t OFFSET  = ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
-    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));
+    static constexpr size_t OFFSET  = HUGE ? 0 : ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
+    static constexpr size_t PADDING = HUGE ? 0 : OFFSET - (sizeof(Meta) + sizeof(State));
 
     // size check
-    static_assert((sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
+    static_assert(HUGE || (sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
 
     Meta    meta;
     State   state;
     uint8_t data[CHUNK - sizeof(meta) - sizeof(state)];
 };
 
-template<size_t N, typename T> struct Allocator<N, T>::Fallback {
-    static constexpr size_t COUNT  = 1;
-    static constexpr size_t OFFSET = 0;
-
-    using State = core::Mask<1>; // unused
-
-    uint8_t data[CHUNK];
-    Meta    meta;
-    State   state; // unused
-};
-
-// default
-template<size_t N, typename T> Allocator<N, T>::Allocator() { }
-
 template<size_t N, typename T> Allocator<N, T>::~Allocator() {
-    Depot* list[3] = { &empty, &full, &partial };
+    Stack* list[3] = { &empty, &full, &partial };
     for(int i = 0; i < 3; ++i) {
-        Depot* depot = list[i];
+        Stack* stack = list[i];
 
-        Chunk* curr = depot->pop(); // pop curr
+        Chunk* curr = stack->pop(); // pop curr
         while(curr != nullptr) {
-            Chunk* next = depot->pop(); // pop next
+            Chunk* next = stack->pop(); // pop next
             destroy(curr);              // delete curr
             curr = next;                // curr to next
         }
@@ -64,6 +50,16 @@ template<size_t N, typename T>
 template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in) noexcept {
     if constexpr(N == 0) {
         return nullptr;
+    }
+
+    // huge pages
+    if constexpr (HUGE) {
+        Chunk* temp = full.pop(); // pop
+        if (!temp) {
+            temp = generate(); // alloc
+        }
+        empty.push(temp); // push
+        return CXX_LAUNDER(reinterpret_cast<U*>(temp)); // return
     }
 
     // check block
@@ -114,23 +110,28 @@ template<typename U> void Allocator<N, T>::release(U* in) {
 
     if constexpr(N == 0) return;
 
+    // huge pages
+    if constexpr (HUGE) {
+        Chunk* chunk = reinterpret_cast<Chunk*>(in);
+        // check
+        if(empty.remove(chunk) == false) {
+            std::abort(); // not found
+        }
+        full.push(chunk); // OK
+        return;
+    }
+
     // get chunk info
     Chunk*    chunk;
     ptrdiff_t index;
 
-    if constexpr(HUGE) {
-        chunk = reinterpret_cast<Chunk*>(in); // known UB but safe in practice
-        index = 0;                            // fallback: chunk == block
-    }
-    else {
-        static constexpr size_t MASK = CHUNK - 1; // e.g. if CHUNK 65536 then operate by 0xFFFF
+    static constexpr size_t MASK = CHUNK - 1; // e.g. if CHUNK 65536 then operate by 0xFFFF
 
-        // find chunk begin address
-        chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~MASK); // known UB but safe in practice
+    // find chunk begin address
+    chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~MASK); // known UB but safe in practice
 
-        // calculate index of the block within the chunk
-        index = ((uintptr_t(in) - Chunk::OFFSET) & MASK) / BLOCK; // optimize by compiler
-    }
+    // calculate index of the block within the chunk
+    index = ((uintptr_t(in) - Chunk::OFFSET) & MASK) / BLOCK; // optimize by compiler
 
     // check pool
     if(chunk->meta.outer != this) std::abort();
@@ -200,56 +201,115 @@ template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chun
 
     // HUGE CHUNK does not require align
     if constexpr(HUGE) {
-        ptr = (Chunk*)global::pal_valloc(BLOCK + global::PAL_PAGE, global::PAL_PAGE); // HUGE: aligned to page
+        ptr = global::pal_valloc<Chunk>(BLOCK); // 1 chunk == 1 block
     }
-    else ptr = (Chunk*)global::pal_valloc(CHUNK, CHUNK); // other: aligned to CHUNK
+    
+    else {
+        ptr = global::pal_valloc<Chunk>(CHUNK, CHUNK); // other: aligned to CHUNK
+        if(ptr) {
+            new(ptr) Chunk;         // init for life cycle
+            ptr->meta.outer = this; // set outer
+        }
+    }
 
     if(ptr) {
-        new(ptr) Chunk;
-
-        ptr->meta.outer = this; // init
-
         counter += Chunk::COUNT; // add
     }
-
     return ptr;
 }
 
 template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept {
-    in->~Chunk();
 
     // matches the parameter when pal_valloc is called
     if constexpr(HUGE) {
-        global::pal_vfree(in, BLOCK + global::PAL_PAGE, global::PAL_PAGE); // HUGE: aligned to page
+        global::pal_vfree(in, BLOCK); // 1 chunk == 1 block
     }
-    else global::pal_vfree(in, CHUNK); // other: aligned to CHUNK
-
+    else {
+        in->~Chunk();
+        global::pal_vfree(in, CHUNK); // other: aligned to CHUNK
+    }
     counter -= Chunk::COUNT;
 }
 
-template<size_t N, typename T> void Allocator<N, T>::Depot::remove(Chunk* in) {
-    Chunk* prev = in->meta.prev;
-    Chunk* next = in->meta.next;
-    if(prev) prev->meta.next = next;
-    if(next) next->meta.prev = prev;
-    if(in == head) head = next;
-}
+template<size_t N, typename T> struct Allocator<N, T>::List {
+    bool remove(Chunk* in) {
+        Chunk* prev = in->meta.prev;
+        Chunk* next = in->meta.next;
+        if (prev) prev->meta.next = next;
+        if (next) next->meta.prev = prev;
+        if (in == head) head = next;
 
-template<size_t N, typename T> void Allocator<N, T>::Depot::push(Chunk* in) {
-    in->meta.prev = nullptr;
-    in->meta.next = head; // push front
-    if(head) {
-        head->meta.prev = in; // link
+        return true;
     }
-    head = in; // new head
-}
 
-template<size_t N, typename T> auto Allocator<N, T>::Depot::pop() -> Chunk* {
-    Chunk* out = head;
-    if(out) {
-        head           = out->meta.next;
-        out->meta.next = nullptr;
-        out->meta.prev = nullptr;
+    bool push(Chunk* in) {
+        in->meta.prev = nullptr;
+        in->meta.next = head; // push front
+        if (head) {
+            head->meta.prev = in; // link
+        }
+        head = in; // new head
+
+        return true;
     }
-    return out;
-}
+
+    Chunk* pop() {
+        Chunk* out = head;
+        if (out) {
+            head = out->meta.next;
+            out->meta.next = nullptr;
+            out->meta.prev = nullptr;
+        }
+        return out;
+    }
+
+    Chunk* head = nullptr;
+};
+
+template<size_t N, typename T> struct Allocator<N, T>::Vector {
+    bool remove(Chunk* in) {
+        for (int i = 0; i < top; ++i) {
+            if (vec[i] == in) {
+                --top;             // reduce
+                vec[i] = vec[top]; // swap and delete
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool push(Chunk* in) {
+        static constexpr size_t EX = (global::PAL_PAGE) / sizeof(void*);
+
+        size_t old = cap * sizeof(void*);
+        if(top >= cap) {
+            Chunk** temp = global::pal_valloc<Chunk*>(old + global::PAL_PAGE); // alloc
+            if (!temp) {
+                return false; // failed
+            }
+
+            // realloc
+            if(vec) {
+                std::memcpy(temp, vec, old); // copy
+                global::pal_vfree(vec, old); // free
+            }
+
+            // new vector
+            vec = temp;
+            cap += EX;
+        }
+        vec[top++] = in; // push
+        return true;
+    }
+
+    Chunk* pop() {
+        if (top == 0) {
+            return nullptr;
+        }
+        return vec[--top];
+    }
+
+    Chunk** vec = nullptr;
+    size_t  top = 0;
+    size_t  cap = 0;
+};

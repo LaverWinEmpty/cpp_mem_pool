@@ -166,8 +166,6 @@
 #ifndef IS_CONSTANT_EVALUATED
 #    if (TARGET_COMP & (COMP_CLANG | COMP_GCC)) || ((TARGET_COMP & COMP_MSVC) && _MSC_VER >= 1925)
 #        define IS_CONSTANT_EVALUATED __builtin_is_constant_evaluated()
-#    elif
-#        define IS_CONSTANT_EVALUATED __builtin_is_constant_evaluated()
 #    else
 #        define IS_CONSTANT_EVALUATED false
 #    endif
@@ -185,6 +183,15 @@
 #        define CXX_INLINE __attribute__((always_inline)) inline
 #    else
 #        define CXX_INLINE inline
+#    endif
+#endif
+
+// launder keyword
+#ifndef CXX_LAUNDER
+#    if TARGET_COMP & (COMP_GCC | COMP_CLANG)
+#        define CXX_LAUNDER __builtin_launder
+#    else
+#        define CXX_LAUNDER
 #    endif
 #endif
 
