@@ -11,17 +11,17 @@ template<size_t N, typename T> struct Allocator<N, T>::Meta {
 
 template<size_t N, typename T> struct Allocator<N, T>::Chunk {
     //! @brief the block total bits / data + flag bits
-    static constexpr size_t COUNT = UNPOOLED ? 1 : (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
+    static constexpr size_t COUNT = WHOLE ? 1 : (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
 
     //! @brief object count to byte, divied to sizeof(uint_64), and round up
-    using State = std::conditional_t<UNPOOLED, core::Mask<0>, core::Mask<(COUNT + 63) / 64>>;
+    using State = core::Mask<(COUNT + 63) / 64>;
 
     //! @brief [ meta | state | PADDING | data ]
-    static constexpr size_t OFFSET  = UNPOOLED ? 0 : ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
-    static constexpr size_t PADDING = UNPOOLED ? 0 : OFFSET - (sizeof(Meta) + sizeof(State));
+    static constexpr size_t OFFSET  = ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
+    static constexpr size_t PADDING = OFFSET - (sizeof(Meta) + sizeof(State));
 
-    // size check
-    static_assert(UNPOOLED || (sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
+    //! @brief size check
+    static_assert((sizeof(Meta) + sizeof(State) + PADDING + BLOCK * COUNT) <= CHUNK);
 
     Meta    meta;
     State   state;
@@ -52,7 +52,7 @@ template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in)
     }
 
     // huge pages
-    if constexpr (UNPOOLED) {
+    if constexpr (WHOLE) {
         Chunk* temp = full.pop(); // pop
         if (!temp) {
             temp = generate(); // alloc
@@ -113,7 +113,7 @@ template<typename U> void Allocator<N, T>::release(U* in) {
     if constexpr(N == 0) return;
 
     // huge pages
-    if constexpr (UNPOOLED) {
+    if constexpr (WHOLE) {
         Chunk* chunk = reinterpret_cast<Chunk*>(in);
         // check
         if(empty.remove(chunk) == false) {
@@ -187,7 +187,7 @@ size_t Allocator<N, T>::shrink() {
     }
 
     // all clear
-    if constexpr(UNPOOLED) {
+    if constexpr(WHOLE) {
         if(current) {
             destroy(current);
             current = nullptr;
@@ -201,8 +201,8 @@ size_t Allocator<N, T>::shrink() {
 template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chunk* {
     Chunk* ptr;
 
-    // UNPOOLED CHUNK does not require align
-    if constexpr(UNPOOLED) {
+    // WHOLE CHUNK does not require align
+    if constexpr(WHOLE) {
         ptr = global::pal_valloc<Chunk>(BLOCK); // 1 chunk == 1 block
     }
     
@@ -223,7 +223,7 @@ template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chun
 template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept {
 
     // matches the parameter when pal_valloc is called
-    if constexpr(UNPOOLED) {
+    if constexpr(WHOLE) {
         global::pal_vfree(in, BLOCK); // 1 chunk == 1 block
     }
     else {
@@ -268,7 +268,7 @@ template<size_t N, typename T> struct Allocator<N, T>::List {
     Chunk* head = nullptr;
 };
 
-template<size_t N, typename T> struct Allocator<N, T>::Vector {
+template<size_t N, typename T> struct Allocator<N, T>::Array {
     bool remove(Chunk* in) {
         for (int i = 0; i < top; ++i) {
             if (vec[i] == in) {

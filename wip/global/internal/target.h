@@ -131,22 +131,9 @@
 #    define TARGET (TARGET_ARCH | TARGET_BITS | TARGET_COMP | TARGET_ENDIAN | TARGET_OS)
 #endif
 
-/**************************************************************************************************
- * STATE FUNCTIONS PREFIX: CHECK                                                                  *
- **************************************************************************************************/
-
 // check target
 #ifndef CHECK_TARGET
 #    define CHECK_TARGET(FLAGS) ((TARGET & (FLAGS)) == (FLAGS))
-#endif
-
-// check __builtin callabe
-#ifndef CHECK_INTRINSIC
-#    ifdef __has_builtin
-#        define CHECK_INTRINSIC(x) __has_builtin(x)
-#    else
-#        define CHECK_INTRINSIC(x) 0
-#    endif
 #endif
 
 /**************************************************************************************************
@@ -162,48 +149,55 @@
 #    endif
 #endif
 
-// is constant evaluated
-#ifndef IS_CONSTANT_EVALUATED
-#    if (TARGET_COMP & (COMP_CLANG | COMP_GCC)) || ((TARGET_COMP & COMP_MSVC) && _MSC_VER >= 1925)
-#        define IS_CONSTANT_EVALUATED __builtin_is_constant_evaluated()
+/**************************************************************************************************
+ * ATTRIBUTE PREFIX: CXX_                                                                         *
+ **************************************************************************************************/
+
+// has bultin
+#ifndef CXX_HAS_BUILTIN
+#    ifdef __has_builtin
+#        define CXX_HAS_BUILTIN(x) __has_builtin(x)
 #    else
-#        define IS_CONSTANT_EVALUATED false
+#        define CXX_HAS_BUILTIN(x) 0 // false
 #    endif
 #endif
 
-/**************************************************************************************************
- * ATTRIBUTE PREFIX: CXX_                                                                    *
- **************************************************************************************************/
-
-// inline keyword
-#ifndef CXX_INLINE
-#    if TARGET_COMP & COMP_MSVC
-#        define CXX_INLINE __forceinline
-#    elif TARGET_COMP & (COMP_CLANG | COMP_GCC)
-#        define CXX_INLINE __attribute__((always_inline)) inline
+// is constant evaluated keyword
+#ifndef CXX_IS_CONSTANT_EVALUATED
+#    if CXX_HAS_BUILTIN(__builtin_is_constant_evaluated) || __GNUC__ >= 9 || _MSC_VER >= 1925
+#        define CXX_IS_CONSTANT_EVALUATED() __builtin_is_constant_evaluated() // GCC 9.1+ / Clang 9.0+
 #    else
-#        define CXX_INLINE inline
+#        define CXX_IS_CONSTANT_EVALUATED() false
 #    endif
 #endif
 
 // launder keyword
 #ifndef CXX_LAUNDER
-#    if TARGET_COMP & (COMP_GCC | COMP_CLANG)
-#        define CXX_LAUNDER __builtin_launder
+#    if CXX_HAS_BUILTIN(__builtin_launder) || (TARGET_COMP == COMP_GCC && __GNUC__ >= 7) // GCC 7.1+
+#        define CXX_LAUNDER(x) __builtin_launder(x)
 #    else
-#        define CXX_LAUNDER
+#        define CXX_LAUNDER(x) (x)
 #    endif
 #endif
 
-//
-#if CXX_UNREACHABLE
-#    if CHECK_INTRINSIC(__builtin_unreachable)
-#        define CXX_UNREACHABLE __builtin_unreachable()
-#    elif TARGET_COMP & COMP_MSVC
-#        define CXX_UNREACHABLE __assume(0)
+// force inline (prefix) keyword
+#ifndef CXX_FORCE_INLINE
+#    if TARGET_COMP & COMP_MSVC
+#        define CXX_FORCE_INLINE __forceinline
+#    elif TARGET_COMP & (COMP_CLANG | COMP_GCC)
+#        define CXX_FORCE_INLINE __attribute__((always_inline)) inline // GCC 3.1+
 #    else
-#        define CXX_UNREACHABLE
+#        define CXX_INLINE inline
 #    endif
+#endif
+
+// no enter hint
+#if CXX_HAS_BUILTIN(__builtin_unreachable) || (TARGET_COMP == COMP_GCC && __GNUC__ >= 5) // GCC 4.5+
+    #define CXX_UNREACHABLE() __builtin_unreachable()
+#elif TARGET_COMP == MSVC
+    #define CXX_UNREACHABLE() __assume(0)
+#else
+    #define CXX_UNREACHABLE() abort()
 #endif
 
 //

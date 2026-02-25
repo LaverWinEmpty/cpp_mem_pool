@@ -1,6 +1,6 @@
 namespace global {
 
-CXX_INLINE void pal_pause() noexcept {
+CXX_FORCE_INLINE void pal_pause() noexcept {
 #if CHECK_TARGET(COMP_MSVC | ARCH_X86)
     _mm_pause();
 

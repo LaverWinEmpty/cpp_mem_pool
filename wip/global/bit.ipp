@@ -9,7 +9,7 @@ constexpr int bit_ctz(uint64_t in) noexcept {
 #elif (TARGET_COMP & COMP_MSVC) && (TARGET_BITS & (BITS_32 | BITS_64))
     unsigned long index = 0;
 
-    if(!IS_CONSTANT_EVALUATED) {
+    if(!CXX_IS_CONSTANT_EVALUATED()) {
 #    if TARGET_BITS == BITS_64
         if(_BitScanForward64(&index, in)) return int(index);
 #    else
@@ -39,7 +39,7 @@ constexpr int bit_clz(uint64_t in) noexcept {
 #elif (TARGET_COMP & COMP_MSVC) && (TARGET_BITS & (BITS_32 | BITS_64))
     unsigned long index = 0;
 
-    if(!IS_CONSTANT_EVALUATED) {
+    if(!CXX_IS_CONSTANT_EVALUATED()) {
 #    if TARGET_BITS == BITS_64
         if(_BitScanReverse64(&index, in)) return 63 - int(index);
 #    else

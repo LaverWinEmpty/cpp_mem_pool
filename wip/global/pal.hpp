@@ -31,7 +31,7 @@ namespace global {
 /**
  * @brief CPU hint for spin-wait loops
  */
-CXX_INLINE void pal_pause() noexcept;
+CXX_FORCE_INLINE void pal_pause() noexcept;
 
 /**
  * @brief call VirtualAlloc or mmap

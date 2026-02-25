@@ -33,20 +33,23 @@ template<size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>
 //! @brief pre-aligned size allocator
 template<size_t N, typename> class Allocator {
 public:
-    static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
+    static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); //!< alginment (for safety)
 
 private:
-    static constexpr bool UNPOOLED = BLOCK >= global::PAL_HUGEPAGE;
+    static constexpr bool WHOLE = BLOCK >= global::PAL_HUGEPAGE; //!< flag
 
 private:
-    struct Meta;   //!< metadata, header
-    struct Chunk;  //!< chunk
-    struct List;   //!< chunk single linked list
-    struct Vector; //!< chunk pointer vector (for huge)
+    struct Meta;  //!< metadata, header
+    struct Chunk; //!< chunk
+    struct List;  //!< chunk as node, single linked list
+    struct Array; //!< chunk pointer vector (for huge)
 
+private:
+    using Stack = std::conditional_t<WHOLE, Array, List>; //!< List or Array selector
+    
 public:
     static constexpr size_t CHUNK =
-        UNPOOLED ? BLOCK : // HUGE: fallback: 1 chunk as 1 block, with meta
+        WHOLE ? BLOCK : // HUGE: fallback: 1 chunk as 1 block, with meta
             (global::bit_pow2(N * 15) <= global::PAL_BOUNDARY ? global::PAL_BOUNDARY : // SMALL: fixed 64KiB, default
                  (global::bit_pow2(N * 15)) // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
@@ -111,8 +114,6 @@ public:
     size_t usable() { return counter; }
 
 private:
-    using Stack = std::conditional_t<BLOCK < global::PAL_HUGEPAGE, List, Vector>;
-
     Stack full;    //!< chunks using block is 0
     Stack empty;   //!< chunks using block is full
     Stack partial; //!< chunks using block is ?
