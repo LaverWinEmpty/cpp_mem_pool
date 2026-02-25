@@ -9,31 +9,31 @@ namespace core {
 template<size_t N> class Mask {
 public:
     /**
-     * @param  [in] size_t index
+     * @param  [in] idx index
      * @return this
      */
-    Mask<N>& on(uint64_t);
+    Mask<N>& on(size_t idx);
 
 public:
     /**
-     *@param  [in] size_t index
+     *@param  [in] idx index
      *@return this
      */
-    Mask<N>& off(uint64_t);
+    Mask<N>& off(size_t idx);
 
 public:
     /**
-     * @param  [in] size_t index
+     * @param  [in] idx index
      * @return this
      */
-    Mask<N>& toggle(uint64_t);
+    Mask<N>& toggle(size_t idx);
 
 public:
     /**
-     * @param  [in] size_t index
+     * @param  [in] idx index
      * @return get flag state
      */
-    bool check(uint64_t) const;
+    bool check(size_t idx) const;
 
 public:
     /**

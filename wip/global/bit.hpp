@@ -11,15 +11,15 @@ namespace global {
 /**
  * @brief count trailing zeros
  *
- * @param [in] uint64_t
+ * @param [in] in 64 bits value to check
  * @return count 0 from LSB to MSB (-1 if input 0)
  */
-constexpr int bit_ctz(uint64_t) noexcept;
+constexpr int bit_ctz(uint64_t in) noexcept;
 
 /**
  * @brief ount leading zeros
  *
- * @param [in] in
+ * @param [in] in 64 bits value to check
  * @return count 0 from MSB to LSB (-1 if input 0)
  */
 constexpr int bit_clz(uint64_t in) noexcept;

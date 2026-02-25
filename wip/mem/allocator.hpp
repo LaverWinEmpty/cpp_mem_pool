@@ -36,7 +36,7 @@ public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); // alginment
 
 private:
-    static constexpr bool HUGE = BLOCK >= global::PAL_HUGEPAGE;
+    static constexpr bool UNPOOLED = BLOCK >= global::PAL_HUGEPAGE;
 
 private:
     struct Meta;   //!< metadata, header
@@ -81,16 +81,16 @@ public:
      *
      * @param [in] ptr pointer from valloc
      */
-    template<typename T = void> void release(T*);
+    template<typename T = void> void release(T* ptr);
 
 public:
     /**
      * @brief syscall: create chunks
      *
-     * @param [in] block count
-     * @return created chunks count
+     * @param [in] cnt need block count
+     * @return created blocks count
      */
-    size_t reserve(size_t);
+    size_t reserve(size_t cnt);
 
 public:
     /**
