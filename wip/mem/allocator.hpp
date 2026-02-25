@@ -46,7 +46,7 @@ private:
 
 public:
     static constexpr size_t CHUNK =
-        HUGE ? BLOCK : // HUGE: fallback: 1 chunk as 1 block, with meta
+        UNPOOLED ? BLOCK : // HUGE: fallback: 1 chunk as 1 block, with meta
             (global::bit_pow2(N * 15) <= global::PAL_BOUNDARY ? global::PAL_BOUNDARY : // SMALL: fixed 64KiB, default
                  (global::bit_pow2(N * 15)) // MEDIUM: at least 15 guaranteed, for 4KiB based on 64KiB
             );
