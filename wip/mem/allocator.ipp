@@ -2,14 +2,14 @@
 #    include "allocator.hpp"
 #endif
 
-template<size_t N, typename T> struct Allocator<N, T>::Meta {
+template<size_t N, bool BASE> struct Allocator<N, BASE>::Meta {
     size_t     used  = 0;
     Allocator* outer = 0;
     Chunk*     next  = nullptr;
     Chunk*     prev  = nullptr;
 };
 
-template<size_t N, typename T> struct Allocator<N, T>::Chunk {
+template<size_t N, bool BASE> struct Allocator<N, BASE>::Chunk {
     //! @brief the block total bits / data + flag bits
     static constexpr size_t COUNT = WHOLE ? 1 : (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
 
@@ -28,7 +28,7 @@ template<size_t N, typename T> struct Allocator<N, T>::Chunk {
     uint8_t data[CHUNK - sizeof(meta) - sizeof(state)];
 };
 
-template<size_t N, typename T> Allocator<N, T>::~Allocator() {
+template<size_t N, bool BASE>::Allocator<N, BASE>::~Allocator() {
     Stack* list[3] = { &empty, &full, &partial };
     for(int i = 0; i < 3; ++i) {
         Stack* stack = list[i];
@@ -45,8 +45,8 @@ template<size_t N, typename T> Allocator<N, T>::~Allocator() {
     }
 }
 
-template<size_t N, typename T>
-template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in) noexcept {
+template<size_t N, bool BASE>
+template<typename U, typename... Args> U* Allocator<N, BASE>::acquire(Args&&... in) noexcept {
     if constexpr(N == 0) {
         return nullptr;
     }
@@ -58,7 +58,7 @@ template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in)
             temp = generate(); // alloc
         }
         empty.push(temp); // push
-        if constexpr(std::is_same_v<T, void>) {
+        if constexpr(std::is_same_v<U, void>) {
             return temp; // return
         }
         else return CXX_LAUNDER(reinterpret_cast<U*>(temp)); // return with launder
@@ -94,20 +94,21 @@ template<typename U, typename... Args> U* Allocator<N, T>::acquire(Args&&... in)
     --counter; // count
 
     // call constructor
-    if constexpr(std::is_same_v<T, T> == false) {
+    if constexpr(std::is_same_v<U, void> == false) {
         if constexpr(sizeof...(Args) != 0) {
-            return new(out) T(std::forward<Args>(in)...);
+            return new(out) U(std::forward<Args>(in)...);
         }
-        else return new(out) T();
+        else return new(out) U();
+        return CXX_LAUNDER(static_cast<U*>(out));
     }
-    return static_cast<U*>(out);
+    else return out;
 }
 
-template<size_t N, typename T>
-template<typename U> void Allocator<N, T>::release(U* in) {
+template<size_t N, bool BASE>
+template<typename U> void Allocator<N, BASE>::release(U* in) {
     // call destrcutor
-    if constexpr(std::is_same_v<T, T> == false) {
-        in->~T();
+    if constexpr(std::is_same_v<U, void> == false) {
+        in->~U();
     }
 
     if constexpr(N == 0) return;
@@ -156,8 +157,7 @@ template<typename U> void Allocator<N, T>::release(U* in) {
     ++counter;
 }
 
-template<size_t N, typename T>
-size_t Allocator<N, T>::reserve(size_t cnt) {
+template<size_t N, bool BASE> size_t Allocator<N, BASE>::reserve(size_t cnt) {
     if(cnt == 0) return 0;       // no reserve
     if(counter >= cnt) return 0; // reserved
 
@@ -174,8 +174,7 @@ size_t Allocator<N, T>::reserve(size_t cnt) {
     return generated; // create count
 }
 
-template<size_t N, typename T>
-size_t Allocator<N, T>::shrink() {
+template<size_t N, bool BASE> size_t Allocator<N, BASE>::shrink() {
     size_t cnt = 0;
     Chunk* del = full.pop(); // pop
 
@@ -198,7 +197,7 @@ size_t Allocator<N, T>::shrink() {
     return cnt;
 }
 
-template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chunk* {
+template<size_t N, bool BASE> auto Allocator<N, BASE>::generate() noexcept -> Chunk* {
     Chunk* ptr;
 
     // WHOLE CHUNK does not require align
@@ -220,7 +219,7 @@ template<size_t N, typename T> auto Allocator<N, T>::generate() noexcept -> Chun
     return ptr;
 }
 
-template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept {
+template<size_t N, bool BASE> void Allocator<N, BASE>::destroy(Chunk* in) noexcept {
 
     // matches the parameter when pal_valloc is called
     if constexpr(WHOLE) {
@@ -233,7 +232,7 @@ template<size_t N, typename T> void Allocator<N, T>::destroy(Chunk* in) noexcept
     counter -= Chunk::COUNT;
 }
 
-template<size_t N, typename T> struct Allocator<N, T>::List {
+template<size_t N, bool BASE> struct Allocator<N, BASE>::List {
     bool remove(Chunk* in) {
         Chunk* prev = in->meta.prev;
         Chunk* next = in->meta.next;
@@ -268,7 +267,7 @@ template<size_t N, typename T> struct Allocator<N, T>::List {
     Chunk* head = nullptr;
 };
 
-template<size_t N, typename T> struct Allocator<N, T>::Array {
+template<size_t N, bool BASE> struct Allocator<N, BASE>::Array {
     bool remove(Chunk* in) {
         for (int i = 0; i < top; ++i) {
             if (vec[i] == in) {

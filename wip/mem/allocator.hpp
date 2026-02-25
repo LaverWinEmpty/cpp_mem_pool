@@ -9,29 +9,29 @@
 #include <utility>
 #include <type_traits>
 
-template<size_t = 0, typename = void> class Allocator;
+template<size_t, bool = false> class Allocator;
 
-//! @brief Allocator size aligner
-//! @note  N = 0 is not allowed
-//!        but declaration is allowed
-//!        and use it as a helper
-template<typename T> class Allocator<0, T> {
-    Allocator() = delete;
-public:
-    static constexpr size_t sizer(size_t n) {
-        if constexpr(std::is_same_v<T, void>) {
-            return 0; // [visible confusion]
-        }
-        return global::num_align(sizeof(T), global::bit_pow2(n));
-    }
-};
+////! @brief Allocator size aligner
+////! @note  N = 0 is not allowed
+////!        but declaration is allowed
+////!        and use it as a helper
+//template<typename T> class Allocator<0, T> {
+//    Allocator() = delete;
+//public:
+//    static constexpr size_t sizer(size_t n) {
+//        if constexpr(std::is_same_v<T, void>) {
+//            return 0; // [visible confusion]
+//        }
+//        return global::num_align(sizeof(T), global::bit_pow2(n));
+//    }
+//};
 
 //! @brief non-aligned size allocator
-template<size_t N> class Allocator<N, std::enable_if_t<(N % sizeof(void*) != 0)>>
-    : public Allocator<global::num_align(N, sizeof(void*))> { };
+template<size_t N> class Allocator<N, false>
+    : public Allocator<N, true> { };
 
 //! @brief pre-aligned size allocator
-template<size_t N, typename> class Allocator {
+template<size_t N, bool> class Allocator {
 public:
     static constexpr size_t BLOCK = global::bit_align(N, sizeof(void*)); //!< alginment (for safety)
 
