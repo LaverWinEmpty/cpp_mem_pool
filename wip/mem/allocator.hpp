@@ -11,21 +11,6 @@
 
 template<size_t, bool = false> class Allocator;
 
-////! @brief Allocator size aligner
-////! @note  N = 0 is not allowed
-////!        but declaration is allowed
-////!        and use it as a helper
-//template<typename T> class Allocator<0, T> {
-//    Allocator() = delete;
-//public:
-//    static constexpr size_t sizer(size_t n) {
-//        if constexpr(std::is_same_v<T, void>) {
-//            return 0; // [visible confusion]
-//        }
-//        return global::num_align(sizeof(T), global::bit_pow2(n));
-//    }
-//};
-
 //! @brief non-aligned size allocator
 template<size_t N> class Allocator<N, false>
     : public Allocator<global::bit_align(N, (N >= global::PAL_HUGEPAGE ? global::PAL_HUGEPAGE : sizeof(void*))), true> { };

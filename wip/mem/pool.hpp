@@ -1,11 +1,14 @@
 #include "allocator.hpp"
 
-template<typename T, size_t ALIGNMENT = sizeof(void*)>
-class Pool: public Allocator<Allocator<0, T>::sizer(ALIGNMENT)> {
-    using Base = Allocator<Allocator<0, T>::sizer(ALIGNMENT)>;
+//! @brief object pool
+template<typename T, size_t ALIGNMENT>
+class Pool : public Allocator<global::bit_align(sizeof(T), ALIGNMENT)> {
+public:
+    static constexpr size_t BLOCK = global::bit_align(sizeof(T), ALIGNMENT); // same as parent
+    using Base = Allocator<BLOCK>;
 
 public:
     template<typename... Args> T* acquire(Args&&... in) {
-        return static_cast<Base*>(this)->acquire<T>(std::forward<Args>(in)...);
+        return Base::template acquire<T>(std::forward<Args>(in)...);
     }
 };
