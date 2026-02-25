@@ -28,7 +28,7 @@ template<size_t, bool = false> class Allocator;
 
 //! @brief non-aligned size allocator
 template<size_t N> class Allocator<N, false>
-    : public Allocator<N, true> { };
+    : public Allocator<global::bit_align(N, (N >= global::PAL_HUGEPAGE ? global::PAL_HUGEPAGE : sizeof(void*))), true> { };
 
 //! @brief pre-aligned size allocator
 template<size_t N, bool> class Allocator {
@@ -105,13 +105,16 @@ public:
 
 public:
     /**
-     * @brief change all chunks to empty state.
+     * @brief change all chunks to empty state
      * @throw when chunk in use on debug
      */
     void reset();
 
 public:
-    size_t usable() { return counter; }
+    /**
+     * @brief get remaind block count
+     */
+    size_t usable();
 
 private:
     Stack full;    //!< chunks using block is 0

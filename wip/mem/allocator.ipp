@@ -197,6 +197,10 @@ template<size_t N, bool BASE> size_t Allocator<N, BASE>::shrink() {
     return cnt;
 }
 
+template<size_t N, bool BASE> size_t Allocator<N, BASE>::usable() {
+    return counter;
+}
+
 template<size_t N, bool BASE> auto Allocator<N, BASE>::generate() noexcept -> Chunk* {
     Chunk* ptr;
 
