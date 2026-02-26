@@ -721,6 +721,29 @@ protected:
     };
     
     using Cache = List;
+    
+public:
+    template<typename T> T* acquire();
+    
+public:
+    template<typename T> void release(T*);
+    
+public:
+    size_t reserve(size_t);
+    
+public:
+    size_t shirnk(size_t = 0);
+    
+public:
+    size_t usable() const;
+    
+private:
+    size_t counter;
+    
+private:
+    Cache freeable;
+    Cache partial;
+    Cache
 };
 
 //! @note: guaranteed at least 64KiB, memory overhead max 20%
@@ -734,4 +757,26 @@ template<size_t N> class Bin : protected Aligner {
     };
     
     using Cache = Array;
+    
+public:
+    template<typename T> T* acquire();
+    
+public:
+    template<typename T> void release(T*);
+    
+public:
+    size_t reserve(size_t);
+    
+public:
+    size_t shirnk(size_t = 0);
+    
+public:
+    size_t usable() const;
+    
+private:
+    size_t counter;
+    
+private:
+    Cache freeable;
+    Cache
 };
