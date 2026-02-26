@@ -602,3 +602,136 @@ private:
 template<typename T> Pool::Singleton* Allocator<T>::instance = Pool::singleton<align(sizeof(T))>();
 
 #undef FOR_POOL
+
+// TODO
+
+
+//! @brief memory align utility, with Allocator Mix-in base class
+class Aligner {
+public:
+    //! @brief align to pointer size (4 or 8 Byte)
+    static constexpr size_t ptr(size_t in) {
+        return global::bit_align(in, sizeof(void*));
+    }
+public:
+    //! @brief align to page size (16 KiB)
+    static constexpr size_t page(size_t in) {
+        return global::bit_align(in, global::PAL_PAGE);
+    }
+public:
+    //! @brief align to huge page baseline size (2 MiB)
+    static constexpr size_t pmd(size_t in) {
+        return global::bit_align(in, global::PAL_HUGEPAGE);
+    }
+public:
+    //! @brief get next power of 2 (round up)
+    static constexpr size_t ceil(size_t in) {
+        return global::bit_pow2(in);
+    }
+public:
+    //! @brief get previous power of 2 (round down)
+    static constexpr size_t floor(size_t in) {
+        if(global::bit_aligned(in)) {
+            return in;
+        }
+        return global::bit_pow2(in >> 1);
+    }
+public:
+    //! @brief get value to multifly for align (align function without bit operator)
+    static constexpr size_t counter(size_t in, size_t align) {
+        return (in + align - 1) / align;
+    }
+protected:
+    //! @brief ghost struct for calculate offset
+    struct Header {
+        void*  next;  //!< next chunk ptr
+        void*  prev;  //!< prev chunk ptr
+        void*  outer; //!< ID: parent allocator ptr
+        size_t used;  //!< counter
+    };
+protected:
+    //! @brief get chunk size, guaranteed at least 15 blocks
+    static constexpr size_t chunk(size_t block) {
+        const size_t ALIGNED = global::bit_pow2(block);
+        size_t size = ALIGNED * 15;
+        
+        // min is 64KiB: 15 blocks with metadata based on 4 KiB
+        if(size <= global::PAL_BOUNDARY) {
+            return global::PAL_BOUNDARY;
+        }
+        return size + ALIGNED; // * 16
+    }
+protected:
+    //! @brief get block count per chunk
+    static constexpr size_t amount(size_t block) {
+        // (claculated chunk reminder bits) / (block bits + mask 1 bits)
+        return ((chunk(block) - sizeof(Header)) * 8) / (block * 8 + 1);
+    }
+protected:
+    //! @brief aligned pointer cache by free-list style
+    struct List {
+        bool  remove(void*); //!< param: Header*
+        bool  push(void*);   //!< param: Header*
+        void* pop();         //!< return: Header*
+        
+        void* head;
+    };
+protected:
+    //! @brief aligned pointer cache by pointer array
+    struct Array {
+        bool  remove(void*);
+        bool  push(void*);
+        void* pop();
+        
+        void** ptr = nullptr;
+        size_t top = 0;
+        size_t cap = 0;
+    };
+protected:
+    Aligner() = default;
+};
+
+//! @note: guaranteed at least 15 blocks, memory overhead max 6.25%
+template<size_t N> class Slab : protected Aligner {
+public:
+    static constexpr size_t BLOCK = ptr(N);
+    static constexpr size_t CHUNK = chunk(BLOCK);
+    static constexpr size_t UNIT  = amount(BLOCK);
+
+protected:
+    using State = core::Mask<counter(amount(BLOCK), 64)>;
+    
+    static constexpr size_t OFFEST =  counter(sizeof(Header) + sizeof(State), N) * N;
+    
+    struct Chunk;
+    union Meta {
+        Header _; //! unused
+        struct {
+            Chunk* next;
+            Chunk* prev;
+            Slab*  outer;
+            size_t used;
+        };
+    };
+    
+    struct Chunk {
+        Meta meta;
+        State state;
+        uint8_t block[CHUNK - sizeof(Header) - sizeof(State)];
+    };
+    
+    using Cache = List;
+};
+
+//! @note: guaranteed at least 64KiB, memory overhead max 20%
+template<size_t N> class Bin : protected Aligner {
+    static constexpr size_t BLOCK = page(N);
+    static constexpr size_t CHUNK = BLOCK; // block as chunk
+    static constexpr size_t UNIT  = 1;     // block per chunk is 1
+    
+    struct Chunk {
+        uint8_t block[CHUNK];
+    };
+    
+    using Cache = Array;
+};
