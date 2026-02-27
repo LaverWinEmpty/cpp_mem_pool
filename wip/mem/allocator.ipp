@@ -224,7 +224,6 @@ template<size_t N, bool BASE> auto Allocator<N, BASE>::generate() noexcept -> Ch
 }
 
 template<size_t N, bool BASE> void Allocator<N, BASE>::destroy(Chunk* in) noexcept {
-
     // matches the parameter when pal_valloc is called
     if constexpr(WHOLE) {
         global::pal_vfree(in, BLOCK); // 1 chunk == 1 block

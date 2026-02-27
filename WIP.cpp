@@ -620,7 +620,7 @@ public:
     }
 public:
     //! @brief align to huge page baseline size (2 MiB)
-    static constexpr size_t pmd(size_t in) {
+    static constexpr size_t segment(size_t in) {
         return global::bit_align(in, global::PAL_HUGEPAGE);
     }
 public:
@@ -641,8 +641,22 @@ public:
     static constexpr size_t counter(size_t in, size_t align) {
         return (in + align - 1) / align;
     }
+public:
+    //! @brief memory align policy
+    static constexpr size_t optimize(size_t n, bool boundary) {
+        if (n <= global::PAL_PAGE) {
+            return ptr(n);
+        }
+        else if (n <= global::PAL_HUGEPAGE) {
+            return page(n);
+        }
+        else return segment(n);
+    }
+public:
+    //! @brief memory align policy
+    static constexpr size_t
 protected:
-    //! @brief ghost struct for calculate offset
+    //! @brief protect code bloat
     struct Header {
         void*  next;  //!< next chunk ptr
         void*  prev;  //!< prev chunk ptr
@@ -702,31 +716,33 @@ protected:
     using State = core::Mask<counter(amount(BLOCK), 64)>;
     
     static constexpr size_t OFFEST =  counter(sizeof(Header) + sizeof(State), N) * N;
-    
-    struct Chunk;
-    union Meta {
-        Header _; //! unused
-        struct {
-            Chunk* next;
-            Chunk* prev;
-            Slab*  outer;
-            size_t used;
-        };
-    };
-    
+
     struct Chunk {
-        Meta meta;
-        State state;
+        Header  meta;
+        State   state;
         uint8_t block[CHUNK - sizeof(Header) - sizeof(State)];
     };
     
     using Cache = List;
     
 public:
-    template<typename T> T* acquire();
+    template<size_t X> bool connect(Bin<X>* outer) {
+        if constexpr (X >= CHUNK) {
+            mgr = outer;
+            return true;
+        }
+        return false;
+    }
     
 public:
-    template<typename T> void release(T*);
+    template<typename T> T* acquire() {
+        
+    }
+    
+public:
+    template<typename T> void release(T* ptr) {
+        
+    }
     
 public:
     size_t reserve(size_t);
@@ -741,9 +757,12 @@ private:
     size_t counter;
     
 private:
-    Cache freeable;
-    Cache partial;
-    Cache
+    Cache frees;
+    Cache partials;
+    Cache fulls;
+    
+private:
+    void* mgr = this;
 };
 
 //! @note: guaranteed at least 64KiB, memory overhead max 20%
@@ -765,10 +784,10 @@ public:
     template<typename T> void release(T*);
     
 public:
-    size_t reserve(size_t);
+    size_t reserve(size_t);	
     
 public:
-    size_t shirnk(size_t = 0);
+    size_t shrink(size_t = 0);
     
 public:
     size_t usable() const;
@@ -777,6 +796,6 @@ private:
     size_t counter;
     
 private:
-    Cache freeable;
-    Cache
+    Cache frees;
+    Cache fulls;
 };
