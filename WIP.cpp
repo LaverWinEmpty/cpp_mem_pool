@@ -605,29 +605,20 @@ template<typename T> Pool::Singleton* Allocator<T>::instance = Pool::singleton<a
 
 // TODO
 
-
 //! @brief memory align utility, with Allocator Mix-in base class
 class Aligner {
 public:
     //! @brief align to pointer size (4 or 8 Byte)
-    static constexpr size_t ptr(size_t in) {
-        return global::bit_align(in, sizeof(void*));
-    }
+    static constexpr size_t ptr(size_t in) { return global::bit_align(in, sizeof(void*)); }
 public:
     //! @brief align to page size (16 KiB)
-    static constexpr size_t page(size_t in) {
-        return global::bit_align(in, global::PAL_PAGE);
-    }
+    static constexpr size_t page(size_t in) { return global::bit_align(in, global::PAL_PAGE); }
 public:
     //! @brief align to huge page baseline size (2 MiB)
-    static constexpr size_t segment(size_t in) {
-        return global::bit_align(in, global::PAL_HUGEPAGE);
-    }
+    static constexpr size_t segment(size_t in) { return global::bit_align(in, global::PAL_HUGEPAGE); }
 public:
     //! @brief get next power of 2 (round up)
-    static constexpr size_t ceil(size_t in) {
-        return global::bit_pow2(in);
-    }
+    static constexpr size_t ceil(size_t in) { return global::bit_pow2(in); }
 public:
     //! @brief get previous power of 2 (round down)
     static constexpr size_t floor(size_t in) {
@@ -638,23 +629,18 @@ public:
     }
 public:
     //! @brief get value to multifly for align (align function without bit operator)
-    static constexpr size_t counter(size_t in, size_t align) {
-        return (in + align - 1) / align;
-    }
+    static constexpr size_t counter(size_t in, size_t align) { return (in + align - 1) / align; }
 public:
     //! @brief memory align policy
-    static constexpr size_t optimize(size_t n, bool boundary) {
-        if (n <= global::PAL_PAGE) {
+    static constexpr size_t policy(size_t in) {
+        if(in <= global::PAL_PAGE) {
             return ptr(n);
         }
-        else if (n <= global::PAL_HUGEPAGE) {
-            return page(n);
+        else if(in <= global::PAL_HUGEPAGE) {
+            return page(in);
         }
-        else return segment(n);
+        else return segment(in);
     }
-public:
-    //! @brief memory align policy
-    static constexpr size_t
 protected:
     //! @brief protect code bloat
     struct Header {
@@ -666,14 +652,13 @@ protected:
 protected:
     //! @brief get chunk size, guaranteed at least 15 blocks
     static constexpr size_t chunk(size_t block) {
-        const size_t ALIGNED = global::bit_pow2(block);
-        size_t size = ALIGNED * 15;
-        
+        size_t size = ptr(block) * 16;
+
         // min is 64KiB: 15 blocks with metadata based on 4 KiB
         if(size <= global::PAL_BOUNDARY) {
             return global::PAL_BOUNDARY;
         }
-        return size + ALIGNED; // * 16
+        return global::bit_pow2(size); // align to boundary
     }
 protected:
     //! @brief get block count per chunk
@@ -687,7 +672,7 @@ protected:
         bool  remove(void*); //!< param: Header*
         bool  push(void*);   //!< param: Header*
         void* pop();         //!< return: Header*
-        
+
         void* head;
     };
 protected:
@@ -696,7 +681,7 @@ protected:
         bool  remove(void*);
         bool  push(void*);
         void* pop();
-        
+
         void** ptr = nullptr;
         size_t top = 0;
         size_t cap = 0;
@@ -706,7 +691,7 @@ protected:
 };
 
 //! @note: guaranteed at least 15 blocks, memory overhead max 6.25%
-template<size_t N> class Slab : protected Aligner {
+template<size_t N> class Slab: protected Aligner {
 public:
     static constexpr size_t BLOCK = ptr(N);
     static constexpr size_t CHUNK = chunk(BLOCK);
@@ -714,88 +699,49 @@ public:
 
 protected:
     using State = core::Mask<counter(amount(BLOCK), 64)>;
-    
-    static constexpr size_t OFFEST =  counter(sizeof(Header) + sizeof(State), N) * N;
+
+    static constexpr size_t OFFEST = counter(sizeof(Header) + sizeof(State), N) * N;
 
     struct Chunk {
         Header  meta;
         State   state;
         uint8_t block[CHUNK - sizeof(Header) - sizeof(State)];
     };
-    
+
     using Cache = List;
-    
+
 public:
     template<size_t X> bool connect(Bin<X>* outer) {
-        if constexpr (X >= CHUNK) {
+        if constexpr(X >= CHUNK) {
             mgr = outer;
             return true;
         }
         return false;
     }
-    
+
 public:
-    template<typename T> T* acquire() {
-        
-    }
-    
+    template<typename T> T* acquire() { }
+
 public:
-    template<typename T> void release(T* ptr) {
-        
-    }
-    
+    template<typename T> void release(T* ptr) { }
+
 public:
     size_t reserve(size_t);
-    
+
 public:
     size_t shirnk(size_t = 0);
-    
+
 public:
     size_t usable() const;
-    
+
 private:
     size_t counter;
-    
+
 private:
     Cache frees;
     Cache partials;
     Cache fulls;
-    
+
 private:
     void* mgr = this;
-};
-
-//! @note: guaranteed at least 64KiB, memory overhead max 20%
-template<size_t N> class Bin : protected Aligner {
-    static constexpr size_t BLOCK = page(N);
-    static constexpr size_t CHUNK = BLOCK; // block as chunk
-    static constexpr size_t UNIT  = 1;     // block per chunk is 1
-    
-    struct Chunk {
-        uint8_t block[CHUNK];
-    };
-    
-    using Cache = Array;
-    
-public:
-    template<typename T> T* acquire();
-    
-public:
-    template<typename T> void release(T*);
-    
-public:
-    size_t reserve(size_t);	
-    
-public:
-    size_t shrink(size_t = 0);
-    
-public:
-    size_t usable() const;
-    
-private:
-    size_t counter;
-    
-private:
-    Cache frees;
-    Cache fulls;
 };

@@ -14,7 +14,7 @@ template<size_t N, bool BASE> struct Allocator<N, BASE>::Chunk {
     static constexpr size_t COUNT = WHOLE ? 1 : (CHUNK - sizeof(Meta)) * 8 / (BLOCK * 8 + 1);
 
     //! @brief object count to byte, divied to sizeof(uint_64), and round up
-    using State = core::Mask<(COUNT + 63) / 64>;
+    using State = core::Flags<(COUNT + 63) / 64>;
 
     //! @brief [ meta | state | PADDING | data ]
     static constexpr size_t OFFSET  = ((sizeof(Meta) + sizeof(State)) / BLOCK) * BLOCK; // align
@@ -128,13 +128,13 @@ template<typename U> void Allocator<N, BASE>::release(U* in) {
     Chunk*    chunk;
     ptrdiff_t index;
 
-    static constexpr size_t MASK = CHUNK - 1; // e.g. if CHUNK 65536 then operate by 0xFFFF
+    static constexpr size_t Flags = CHUNK - 1; // e.g. if CHUNK 65536 then operate by 0xFFFF
 
     // find chunk begin address
-    chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~MASK); // known UB but safe in practice
+    chunk = reinterpret_cast<Chunk*>(uintptr_t(in) & ~Flags); // known UB but safe in practice
 
     // calculate index of the block within the chunk
-    index = ((uintptr_t(in) - Chunk::OFFSET) & MASK) / BLOCK; // optimize by compiler
+    index = ((uintptr_t(in) - Chunk::OFFSET) & Flags) / BLOCK; // optimize by compiler
 
     // check pool
     if(chunk->meta.outer != this) std::abort();

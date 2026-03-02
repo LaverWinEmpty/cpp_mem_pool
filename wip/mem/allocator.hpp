@@ -1,7 +1,7 @@
 #ifndef MEM_ALLOCATOR_HPP
 #define MEM_ALLOCATOR_HPP
 
-#include "../core/mask.hpp"
+#include "../core/flags.hpp"
 #include "../global/pal.hpp"
 #include "../global/num.hpp"
 #include <cassert>
@@ -112,11 +112,11 @@ private:
 
 private:
     //! @brief syscall allocate
-    Chunk* generate() noexcept;
+    void* generate() noexcept;
 
 private:
     //! @brief syscall deallocate
-    void destroy(Chunk*) noexcept;
+    void destroy(void*) noexcept;
 };
 
 #include "allocator.ipp"
