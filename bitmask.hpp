@@ -22,7 +22,7 @@ public:
     static size_t ffs(const Word flags[], size_t size);
 
 protected:
-    static constexpr size_t cycle(size_t bits);
+    static constexpr size_t count(size_t bits);
 
 private:
     static constexpr Word& word(Word flags[], size_t index) { return flags[size_t(index >> SHIFT)]; }
@@ -49,7 +49,7 @@ bool Bitmask::check(Word flags[], size_t size, size_t index) {
 }
 
 size_t Bitmask::ffz(const Word flags[], size_t size) {
-    size_t bytes = cycle(size);
+    size_t bytes = count(size);
 
     size_t out = 0;
     for(size_t i = 0; i < bytes; ++i) {
@@ -68,7 +68,7 @@ size_t Bitmask::ffz(const Word flags[], size_t size) {
 }
 
 size_t Bitmask::ffs(const Word flags[], size_t size) {
-    size_t bytes = cycle(size);
+    size_t bytes = count(size);
 
     size_t out = Word(-1);
     for(size_t i = 0; i < bytes; ++i) {
@@ -87,10 +87,10 @@ size_t Bitmask::ffs(const Word flags[], size_t size) {
 }
 
 void Bitmask::reset(Word flags[], size_t size) {
-    std::memset(flags, 0, cycle(size));
+    std::memset(flags, 0, count(size));
 }
 
-constexpr size_t Bitmask::cycle(size_t n) {
+constexpr size_t Bitmask::count(size_t n) {
     return (n + MASK) / BITS; // same as Aligner::count
 }
 
@@ -112,7 +112,7 @@ private:
     Word flags[N] = { 0 };
 };
 
-template<size_t N> class Flags<N, false>: public Flags<Bitmask::cycle(N), true> {
+template<size_t N> class Flags<N, false>: public Flags<Bitmask::count(N), true> {
 public:
     static constexpr size_t SIZE = N;
 };
