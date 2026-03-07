@@ -58,6 +58,11 @@ constexpr uint64_t bit_align(uint64_t in, uint64_t alignment = sizeof(void*)) no
  */
 constexpr bool bit_aligned(uint64_t in, uint64_t alignment = 0) noexcept;
 
+/**
+ * @brief pop count
+ */
+constexpr int bit_popcnt(uint64_t in) noexcept;
+
 } // namespace global
 
 #include "bit.ipp"

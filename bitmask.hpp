@@ -13,11 +13,11 @@ protected:
     };
 
 public:
-    template<typename T> static void set   (T* flags, size_t index);
-    template<typename T> static void unset (T* flags, size_t index);
-    template<typename T> static void flip  (T* flags, size_t index);
-    template<typename T> static bool check (const T* flags, size_t index);
-    
+    template<typename T> static void set(T* flags, size_t index);
+    template<typename T> static void unset(T* flags, size_t index);
+    template<typename T> static void flip(T* flags, size_t index);
+    template<typename T> static bool check(const T* flags, size_t index);
+
 public:
     template<typename T> static size_t ffz(const T* flags, size_t bits);
     template<typename T> static size_t ffs(const T* flags, size_t bits);
@@ -35,57 +35,17 @@ protected:
     Bitmask() = default;
 };
 
-template<typename T> constexpr T& Bitmask::word(T* flags, size_t index) {
-    return flags[size_t(index >> Operator<T>::SHIFT)];
-}
-
-template<typename T> constexpr T Bitmask::bit(size_t index) {
-    return T(1) << size_t(index & Operator<T>::MASK);
-}
-
-template<typename T> void Bitmask::set(T* flags, size_t index) {
-    word(flags, index) |= bit<T>(index);
-}
-
-template<typename T> void Bitmask::unset(T* flags, size_t index) {
-    word(flags, index) &= ~bit<T>(index);
-}
-
-template<typename T> void Bitmask::flip(T* flags, size_t index) {
-    word(flags, index) ^= bit<T>(index);
-}
-
-template<typename T> bool Bitmask::check(const T* flags, size_t index) {
-    return word(flags, index) & bit<T>(index);
-}
-
-template<typename T> size_t Bitmask::ffz(const T* flags, size_t bits) {
-    return first<T, 0>(flags, bits);
-}
-
-template<typename T> size_t Bitmask::ffs(const T* flags, size_t bits) {
-    return first<T, 1>(flags, bits);
-}
-
-template<typename T> constexpr size_t Bitmask::words(size_t n) {
-    return (n + Operator<T>::MASK) / Operator<T>::BITS; // same as Aligner::count
-}
-
-template<typename T> constexpr size_t Bitmask::bytes(size_t n) {
-    return words<T>(n) * sizeof(T); // to byte
-}
-
 template<typename T, bool SET> size_t Bitmask::first(const T* flags, size_t bits) {
     T target;
-    
+
     size_t loop = words<T>(bits);
-    for (size_t i = 0; i < loop; ++i) {
-        if constexpr (SET) {
+    for(size_t i = 0; i < loop; ++i) {
+        if constexpr(SET) {
             target = flags[i];
         }
         else target = ~flags[i];
-        if (target != 0) {
-            int cnt = global::bit_ctz(target);
+        if(target != 0) {
+            int    cnt = global::bit_ctz(target);
             size_t out = (i << Operator<T>::SHIFT) + size_t(cnt);
             return (out < bits) ? out : T(-1);
         }
@@ -93,10 +53,10 @@ template<typename T, bool SET> size_t Bitmask::first(const T* flags, size_t bits
     return size_t(-1);
 }
 
-//template<size_t N, bool = false> class Flags;
+// template<size_t N, bool = false> class Flags;
 //
-//template<size_t N> class Flags<N, true>: protected Bitmask {
-//public:
+// template<size_t N> class Flags<N, true>: protected Bitmask {
+// public:
 //    inline void on(size_t index) { Bitmask::on(flags, index, N << SHIFT); }
 //    inline void off(size_t index) { Bitmask::off(flags, index, N << SHIFT); }
 //    inline void toggle(size_t index) { Bitmask::toggle(flags, index, N << SHIFT); }
@@ -104,20 +64,20 @@ template<typename T, bool SET> size_t Bitmask::first(const T* flags, size_t bits
 //    inline size_t next() { return Bitmask::ffz(flags, N << SHIFT); }
 //    inline void reset() { Bitmask::reset(flags, sizeof(Word) * N); }
 //
-//public:
+// public:
 //    Word read(size_t index) const { return flags[index]; }
 //
-//private:
+// private:
 //    Word flags[N] = { 0 };
 //};
 //
-//template<size_t N> class Flags<N, false>: public Flags<Bitmask::words(N), true> {
-//public:
+// template<size_t N> class Flags<N, false>: public Flags<Bitmask::words(N), true> {
+// public:
 //    static constexpr size_t SIZE = N;
 //};
 //
-//template<bool BASE> class Flags<0, BASE>: protected Bitmask {
-//public:
+// template<bool BASE> class Flags<0, BASE>: protected Bitmask {
+// public:
 //    static constexpr size_t SIZE = 0;
 //
 //    inline void on(size_t index) { }
