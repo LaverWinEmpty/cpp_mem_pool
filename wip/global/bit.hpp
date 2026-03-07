@@ -30,7 +30,13 @@ constexpr int bit_clz(uint64_t in) noexcept;
  * @param [in] in source value
  * @return power of 2 (1 if input 0)
  */
-constexpr uint64_t bit_pow2(uint64_t in) noexcept;
+constexpr uint64_t bit_roundup(uint64_t in) noexcept;
+
+// TODO: 구현
+constexpr uint64_t bit_rounddown(uint64_t in) noexcept;
+
+// TODO: alinged 기능 해당 함수로 이전
+constexpr bool bit_onehot(uint64_t in) noexcept;
 
 /**
  * @brief calculate binary logarithm
@@ -38,7 +44,7 @@ constexpr uint64_t bit_pow2(uint64_t in) noexcept;
  * @param[in] in aligned value
  * @return exponent of 2 (-1 if input not aligned value)
  */
-constexpr int bit_log2(uint64_t in) noexcept;
+constexpr int bit_logbin(uint64_t in) noexcept;
 
 /**
  * @brief get padded value
@@ -59,7 +65,10 @@ constexpr uint64_t bit_align(uint64_t in, uint64_t alignment = sizeof(void*)) no
 constexpr bool bit_aligned(uint64_t in, uint64_t alignment = 0) noexcept;
 
 /**
- * @brief pop count
+ * @brief get pop count
+ *
+ * @param [in] in value
+ * @return 1 count
  */
 constexpr int bit_popcnt(uint64_t in) noexcept;
 

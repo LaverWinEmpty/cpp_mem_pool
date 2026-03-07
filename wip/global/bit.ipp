@@ -69,7 +69,7 @@ constexpr int bit_clz(uint64_t in) noexcept {
     return sizeof(uint64_t) * 8 - bit_popcnt(in);
 }
 
-constexpr uint64_t bit_pow2(uint64_t in) noexcept {
+constexpr uint64_t bit_roundup(uint64_t in) noexcept {
     if(in <= 1) return 1;
 
     // 0x10 -> 0x0F -> get count 60 -> (1 << (64 - 60)) = 0x10
@@ -78,7 +78,7 @@ constexpr uint64_t bit_pow2(uint64_t in) noexcept {
     return shift >= 64 ? uint64_t(-1) : uint64_t(1) << shift;
 }
 
-constexpr int bit_log2(uint64_t in) noexcept {
+constexpr int bit_logbin(uint64_t in) noexcept {
     // 0 is that for induce an error
     return bit_ctz(bit_aligned(in) ? in : 0);
 }
@@ -122,20 +122,19 @@ constexpr int bit_popcnt(uint64_t in) noexcept {
     #endif
     }
 
-    // fallback for constexpr
+    // fallback for constexpr: SWAR algorithm
     uint64_t hi = (in >> 1); // (high to low)
 
     hi &= 0x5555555555555555ull;      // get high bit      (0b0101)
     in -= hi;                         // 2 bits count      (0b01)
-    hi = in & 0xCCCCCCCCCCCCCCCCull; // get high 2 bits   (0b1100)
-    in = in & 0x3333333333333333ull; // get low 2 bits    (0b0011)
-    in = in + (hi >> 2);             // 4 bits count      (1100 + 0011)
-    in = in + (in >> 4);             // 8 bits count      (11110000 + 00001111)
+    hi  = in & 0xCCCCCCCCCCCCCCCCull; // get high 2 bits   (0b1100)
+    in  = in & 0x3333333333333333ull; // get low 2 bits    (0b0011)
+    in  = in + (hi >> 2);             // 4 bits count      (1100 + 0011)
+    in  = in + (in >> 4);             // 8 bits count      (11110000 + 00001111)
     in &= 0x0F0F0F0F0F0F0F0Full;      // clean high 4 bits (11111111 & 00001111)
     in *= 0x0101010101010101ull;      // parallel shfit    (00001111 << 8)
 
     return in >> 56; // return merged at high 8 bits
 }
-
 
 } // namespace global
