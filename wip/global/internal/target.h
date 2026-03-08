@@ -194,7 +194,7 @@
 // no enter hint
 #if CXX_HAS_BUILTIN(__builtin_unreachable) || (TARGET_COMP == COMP_GCC && __GNUC__ >= 5) // GCC 4.5+
     #define CXX_UNREACHABLE() __builtin_unreachable()
-#elif TARGET_COMP == MSVC
+#elif TARGET_COMP == COMP_MSVC
     #define CXX_UNREACHABLE() __assume(0)
 #else
     #define CXX_UNREACHABLE() abort()
