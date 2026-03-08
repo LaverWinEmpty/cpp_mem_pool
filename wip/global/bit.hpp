@@ -8,46 +8,23 @@
  **************************************************************************************************/
 namespace global {
 
-/**
- * @brief count trailing zeros
- *
- * @param [in] in 64 bits value to check
- * @return count 0 from LSB to MSB (-1 if input 0)
- */
-constexpr int bit_ctz(uint64_t in) noexcept;
+//! @brief like `std::popcount`
+constexpr int bit_popcnt(uint64_t in) noexcept;
+
+//! @brief  BitScanFirst, 0-based ffs
+constexpr int bit_bsf(uint64_t in) noexcept;
+
+//! @brief  BitScanReverse, 0-based fls
+constexpr int bit_bsr(uint64_t in) noexcept;
+
+//! @brief get next power of 2
+constexpr uint64_t bit_ceil(uint64_t in) noexcept;
+
+//! @brief get previous power of 2
+constexpr uint64_t bit_floor(uint64_t in) noexcept;
 
 /**
- * @brief ount leading zeros
- *
- * @param [in] in 64 bits value to check
- * @return count 0 from MSB to LSB (-1 if input 0)
- */
-constexpr int bit_clz(uint64_t in) noexcept;
-
-/**
- * @brief get next power of 2
- *
- * @param [in] in source value
- * @return power of 2 (1 if input 0)
- */
-constexpr uint64_t bit_roundup(uint64_t in) noexcept;
-
-// TODO: 구현
-constexpr uint64_t bit_rounddown(uint64_t in) noexcept;
-
-// TODO: alinged 기능 해당 함수로 이전
-constexpr bool bit_onehot(uint64_t in) noexcept;
-
-/**
- * @brief calculate binary logarithm
- *
- * @param[in] in aligned value
- * @return exponent of 2 (-1 if input not aligned value)
- */
-constexpr int bit_logbin(uint64_t in) noexcept;
-
-/**
- * @brief get padded value
+ * @brief get aligned value
  *
  * @param [in] in        value to pad
  * @param [in] alignment if 0 then adjust to 1
@@ -63,14 +40,6 @@ constexpr uint64_t bit_align(uint64_t in, uint64_t alignment = sizeof(void*)) no
  * @return false if input alignment is not aligned
  */
 constexpr bool bit_aligned(uint64_t in, uint64_t alignment = 0) noexcept;
-
-/**
- * @brief get pop count
- *
- * @param [in] in value
- * @return 1 count
- */
-constexpr int bit_popcnt(uint64_t in) noexcept;
 
 } // namespace global
 

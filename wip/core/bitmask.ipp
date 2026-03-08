@@ -71,7 +71,7 @@ template<typename T, bool SET> size_t Bitmask::first(const T* flags, size_t bits
         else target = ~flags[i]; // find 0, flip
 
         if (target != 0) {
-            int    cnt = global::bit_ctz(target);
+            int    cnt = global::bit_bsf(target);
             size_t out = (i << Operator<T>::SHIFT) + size_t(cnt);
 
             if(out < bits) {

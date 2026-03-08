@@ -13,7 +13,7 @@ protected:
     template<typename T> struct Operator {
         static constexpr size_t BITS  = sizeof(T) * 8;
         static constexpr size_t MASK  = BITS - 1;
-        static constexpr size_t SHIFT = global::bit_log2(BITS);
+        static constexpr size_t SHIFT = global::bit_bsr(BITS);
     };
 
 public:
