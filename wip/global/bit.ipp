@@ -20,16 +20,16 @@ constexpr int bit_popcnt(uint64_t in) noexcept {
     // fallback for constexpr: SWAR algorithm
     uint64_t hi = (in >> 1); // (high to low)
 
-    hi &= 0x5555555555555555ull;      // get high bit      (0b0101)
-    in -= hi;                         // 2 bits count      (0b01) / note: [hi][lo] - [0][hi] = count
-    hi  = in & 0xCCCCCCCCCCCCCCCCull; // get high 2 bits   (0b1100)
-    in  = in & 0x3333333333333333ull; // get low 2 bits    (0b0011)
-    in  = in + (hi >> 2);             // 4 bits count      (1100 + 0011)
-    in  = in + (in >> 4);             // 8 bits count      (11110000 + 00001111)
-    in &= 0x0F0F0F0F0F0F0F0Full;      // clean high 4 bits (11111111 & 00001111)
-    in *= 0x0101010101010101ull;      // parallel shfit    (00001111 << 8, 16, 24 ... 56)
+    hi &= 0x5555555555555555ull;      // get high bit           (0b0101)
+    in -= hi;                         // 2 bits count           (0b01) / note: [hi][lo] - [0][hi] = count
+    hi  = in & 0xCCCCCCCCCCCCCCCCull; // get high 2 bits        (0b1100)
+    in  = in & 0x3333333333333333ull; // get low 2 bits         (0b0011)
+    in  = in + (hi >> 2);             // 4 bits count           (1100 + 0011)
+    in  = in + (in >> 4);             // 8 bits count           (11110000 + 00001111)
+    in &= 0x0F0F0F0F0F0F0F0Full;      // clean high 4 bits      (11111111 & 00001111)
+    in *= 0x0101010101010101ull;      // parallel shfit and sum (00001111 << 8, 16, 24 ... 56)
 
-    return in >> 56; // return merged at high 8 bits
+    return in >> ((sizeof(uint64_t) - 1) * 8); // return merged at high 8 bits
 }
 
 
@@ -54,15 +54,13 @@ constexpr int bit_bsf(uint64_t in) noexcept {
     return int(__builtin_ctzll(in)); // compile-time
     CXX_UNREACHABLE();
 #endif
-
     // fallback for constexpr
-    //
-    // e.g. input 12 (1100)
-    // (in - 1) -> 1011 (fill low bits)
-    // (~in)    -> 0011 (flip for find zeros)
-    // AND        ------
-    //             0011 -> return 2
-    return bit_popcnt((in - 1) & ~in);
+
+    return bit_popcnt((in - 1) & ~in); // e.g. input 12 (1100)
+                                       // (in - 1): 1011 (fill low bits)                                  
+                                       // (~in)   : 0011 (flip for find zeros)
+                                       //      AND ------
+                                       //           0011 -> return 2
 }
 
 constexpr int bit_bsr(uint64_t in) noexcept {
