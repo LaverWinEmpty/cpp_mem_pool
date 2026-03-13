@@ -24,7 +24,7 @@ template<typename T> void Bitmask::flip(T* flags, size_t index) {
     word(flags, index) ^= bit<T>(index);
 }
 
-template<typename T> bool Bitmask::check(const T* flags, size_t index) {
+template<typename T> bool Bitmask::test(const T* flags, size_t index) {
     return word(flags, index) & bit<T>(index);
 }
 
@@ -40,7 +40,7 @@ template<typename T> void Bitmask::flip(T& flags, size_t index) {
     flags ^= bit<T>(index);
 }
 
-template<typename T> bool Bitmask::check(const T& flags, size_t index) {
+template<typename T> bool Bitmask::test(const T& flags, size_t index) {
     return flags & bit<T>(index);
 }
 
@@ -50,6 +50,14 @@ template<typename T> size_t Bitmask::ffz(const T* flags, size_t bits) {
 
 template<typename T> size_t Bitmask::ffs(const T* flags, size_t bits) {
     return first<T, 1>(flags, bits);
+}
+
+template<typename T> size_t Bitmask::ffz(const T& flags) {
+    return first<T, 0>(&flags, Operator<T>::BITS);
+}
+
+template<typename T> size_t Bitmask::ffs(const T& flags) {
+    return first<T, 1>(&flags, Operator<T>::BITS);
 }
 
 template<typename T> constexpr size_t Bitmask::words(size_t n) {

@@ -20,19 +20,23 @@ public:
     template<typename T> static void set(T* flags, size_t index);
     template<typename T> static void unset(T* flags, size_t index);
     template<typename T> static void flip(T* flags, size_t index);
-    template<typename T> static bool check(const T* flags, size_t index);
+    template<typename T> static bool test(const T* flags, size_t index);
 
 public:
     template<typename T> static void set(T& flags, size_t index);
     template<typename T> static void unset(T& flags, size_t index);
     template<typename T> static void flip(T& flags, size_t index);
-    template<typename T> static bool check(const T& flags, size_t index);
+    template<typename T> static bool test(const T& flags, size_t index);
 
 public:
     template<typename T> static size_t ffz(const T* flags, size_t bits);
     template<typename T> static size_t ffs(const T* flags, size_t bits);
+    
+public:
+    template<typename T> static size_t ffz(const T& flags);
+    template<typename T> static size_t ffs(const T& flags);
 
-protected:
+public:
     template<typename T> static constexpr size_t words(size_t bits);
     template<typename T> static constexpr size_t bytes(size_t bits);
 
