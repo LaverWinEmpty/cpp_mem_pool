@@ -9,7 +9,7 @@ template<typename T> constexpr T& Bitmask::word(T* flags, size_t index) {
 }
 
 template<typename T> constexpr T Bitmask::bit(size_t index) {
-    return 1ull << size_t(index & Operator<T>::MASK);
+    return T(1) << size_t(index & Operator<T>::MASK);
 }
 
 template<typename T> void Bitmask::set(T* flags, size_t index) {
@@ -52,6 +52,14 @@ template<typename T> size_t Bitmask::ffs(const T* flags, size_t bits) {
     return first<T, 1>(flags, bits);
 }
 
+template<typename T> size_t Bitmask::count(const T* flags, size_t bits) {
+    size_t cnt = 0;
+    for(size_t i = 0, loop = words<T>(bits); i < loop; ++i) {
+        cnt += global::bit_popcnt(flags[i]);
+    }
+    return cnt;
+}
+
 template<typename T> size_t Bitmask::ffz(const T& flags) {
     return first<T, 0>(&flags, Operator<T>::BITS);
 }
@@ -59,6 +67,11 @@ template<typename T> size_t Bitmask::ffz(const T& flags) {
 template<typename T> size_t Bitmask::ffs(const T& flags) {
     return first<T, 1>(&flags, Operator<T>::BITS);
 }
+
+template<typename T> size_t Bitmask::count(const T& flags) {
+    return global::bit_popcnt(flags);
+}
+
 
 template<typename T> constexpr size_t Bitmask::words(size_t n) {
     return (n + Operator<T>::MASK) / Operator<T>::BITS; // same as Aligner::count

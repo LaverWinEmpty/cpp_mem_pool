@@ -2,7 +2,8 @@
 #define CORE_BITMASK_HPP
 
 #include "../global/bit.hpp"
-#include "cstring"
+#include <type_traits>
+#include <cstring>
 
 namespace core {
 
@@ -31,11 +32,13 @@ public:
 public:
     template<typename T> static size_t ffz(const T* flags, size_t bits);
     template<typename T> static size_t ffs(const T* flags, size_t bits);
+    template<typename T> static size_t count(const T* flags, size_t bits);
     
 public:
     template<typename T> static size_t ffz(const T& flags);
     template<typename T> static size_t ffs(const T& flags);
-
+    template<typename T> static size_t count(const T& flags);
+    
 public:
     template<typename T> static constexpr size_t words(size_t bits);
     template<typename T> static constexpr size_t bytes(size_t bits);
