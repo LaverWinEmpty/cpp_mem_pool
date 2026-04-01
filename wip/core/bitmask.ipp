@@ -2,6 +2,8 @@
 #    include "bitmask.hpp"
 #endif
 
+#include "iostream"
+
 namespace core {
 
 template<typename T> constexpr T& Bitmask::word(T* flags, size_t index) {
@@ -53,11 +55,18 @@ template<typename T> size_t Bitmask::ffs(const T* flags, size_t bits) {
 }
 
 template<typename T> size_t Bitmask::count(const T* flags, size_t bits) {
-    size_t cnt = 0;
-    for(size_t i = 0, loop = words<T>(bits); i < loop; ++i) {
-        cnt += global::bit_popcnt(flags[i]);
+    if(bits == 0) return 0;
+    
+    size_t cnt  = 0;
+    size_t loop = words<T>(bits) - 1;
+    for(size_t i = 0; i < loop; ++i) {
+        cnt += global::bit_popcnt(std::make_unsigned_t<T>(flags[i]));
     }
-    return cnt;
+    
+    size_t   remainder = bits - (loop * Operator<T>::BITS);
+    uint64_t area      = ~0ull >> (Operator<T>::BITS - remainder);
+    
+    return cnt + global::bit_popcnt(std::make_unsigned_t<T>(flags[loop]) & area);
 }
 
 template<typename T> size_t Bitmask::ffz(const T& flags) {
@@ -69,9 +78,8 @@ template<typename T> size_t Bitmask::ffs(const T& flags) {
 }
 
 template<typename T> size_t Bitmask::count(const T& flags) {
-    return global::bit_popcnt(flags);
+    return global::bit_popcnt(std::make_unsigned_t<T>(flags));
 }
-
 
 template<typename T> constexpr size_t Bitmask::words(size_t n) {
     return (n + Operator<T>::MASK) / Operator<T>::BITS; // same as Aligner::count
@@ -82,7 +90,7 @@ template<typename T> constexpr size_t Bitmask::bytes(size_t n) {
 }
 
 template<typename T, bool SET> size_t Bitmask::first(const T* flags, size_t bits) {
-    T target;
+    std::make_unsigned_t<T> target;
 
     size_t loop = words<T>(bits);
     for (size_t i = 0; i < loop; ++i) {

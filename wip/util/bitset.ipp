@@ -37,11 +37,8 @@ template<size_t SIZE, typename Word> size_t Bitset<SIZE, Word, true>::next() {
     return Bitmask::ffz(flags, SIZE << Operator<Word>::SHIFT);
 }
 
-template<size_t SIZE, typename Word> size_t Bitset<SIZE, Word, true>::next() {
-    size_t cnt;
-    for(int i = 0; i < SIZE; ++i) {
-        cnt = global::bit_popcnt(flags[i]);
-    }
+template<size_t SIZE, typename Word> size_t Bitset<SIZE, Word, true>::count() {
+    return Bitmask::count(flags, SIZE << Operator<Word>::SHIFT);
 }
 
 }

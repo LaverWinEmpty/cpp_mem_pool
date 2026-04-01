@@ -47,7 +47,7 @@ private:
     template<typename T> static constexpr T& word(T* flags, size_t index);
     template<typename T> static constexpr T  bit(size_t index);
     template<typename T, bool> static size_t first(const T* flags, size_t size);
-
+    
 protected:
     Bitmask() = default;
 };
